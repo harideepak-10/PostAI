@@ -853,20 +853,14 @@
           <label>Provider</label>
           <select id="kImgProvider" onchange="toggleImgProviderFields()">
             <option value="pollinations">Pollinations — Free (no key needed)</option>
-            <option value="gemini">Google Gemini Imagen 3</option>
-            <option value="openai">OpenAI DALL-E 3</option>
+            <option value="gemini">Google Gemini Imagen 3 — Best quality (free key)</option>
           </select>
-          <div class="mf-hint">Gemini and DALL-E produce higher quality images but require API keys.</div>
+          <div class="mf-hint">Gemini Imagen 3 produces significantly better marketing visuals.</div>
         </div>
         <div class="mf" id="mfGeminiKey" style="display:none;">
           <label>Google AI Studio Key</label>
           <input type="password" id="kGeminiKey" placeholder="AIza..."/>
-          <div class="mf-hint">Get free key at <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a></div>
-        </div>
-        <div class="mf" id="mfOpenAIImgKey" style="display:none;">
-          <label>OpenAI API Key</label>
-          <input type="password" id="kOpenAIImgKey" placeholder="sk-..."/>
-          <div class="mf-hint">Requires a paid OpenAI account. DALL-E 3 HD quality.</div>
+          <div class="mf-hint">Free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> — takes 30 seconds.</div>
         </div>
       </div>
 
@@ -941,27 +935,26 @@ let activePlatforms = new Set(['linkedin','instagram','facebook']);
 let generatedImageUrl = null;
 
 /* ─── SETTINGS ────────────────────────────────────────────── */
-const GROQ_API_BASE   = 'https://api.groq.com/openai/v1';
-const DEFAULT_MODEL   = 'llama-3.3-70b-versatile';
-const DEFAULT_BACKEND = 'http://localhost:8000';
+const GROQ_API_BASE  = 'https://api.groq.com/openai/v1';
+const DEFAULT_MODEL  = 'llama-3.3-70b-versatile';
 const KEYS = {
-  kOAI:'oai', kModel:'model', kBackend:'backend',
-  kImgProvider:'imgProvider', kGeminiKey:'geminiKey', kOpenAIImgKey:'openaiImgKey',
+  kOAI:'oai', kModel:'model',
+  kImgProvider:'imgProvider', kGeminiKey:'geminiKey',
   kLI:'li', kLIUrn:'liUrn', kFB:'fb', kFBPage:'fbPage', kIG:'ig'
 };
 
-const getKey = k => localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : k==='backend' ? DEFAULT_BACKEND : k==='imgProvider' ? 'pollinations' : '');
+const getKey = k => localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : k==='imgProvider' ? 'pollinations' : '');
 
 function toggleImgProviderFields() {
   const v = document.getElementById('kImgProvider')?.value || 'pollinations';
-  document.getElementById('mfGeminiKey').style.display    = v === 'gemini'  ? '' : 'none';
-  document.getElementById('mfOpenAIImgKey').style.display = v === 'openai'  ? '' : 'none';
+  const gEl = document.getElementById('mfGeminiKey');
+  if (gEl) gEl.style.display = v === 'gemini' ? '' : 'none';
 }
 
 function openSettings() {
   Object.entries(KEYS).forEach(([id, k]) => {
     const el = document.getElementById(id);
-    if (el) el.value = localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : k==='backend' ? DEFAULT_BACKEND : k==='imgProvider' ? 'pollinations' : '');
+    if (el) el.value = localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : k==='imgProvider' ? 'pollinations' : '');
   });
   toggleImgProviderFields();
   document.getElementById('modal').classList.add('show');
@@ -1005,85 +998,128 @@ function toast(msg) {
   tTimer = setTimeout(() => el.classList.remove('show'), 3400);
 }
 
+/* ─── IMAGE GENERATION ─────────────────────────────────────── */
+
+async function genImageGemini(prompt, apiKey) {
+  /* Gemini Imagen 3 — called directly from browser, returns data:image URL */
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instances: [{ prompt: prompt + '. No text, no letters, no watermarks, no logos.' }],
+        parameters: { sampleCount: 1, aspectRatio: '4:5', safetyFilterLevel: 'block_few' }
+      })
+    }
+  );
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Gemini ${r.status}`);
+  }
+  const data = await r.json();
+  const b64  = data.predictions?.[0]?.bytesBase64Encoded;
+  if (!b64) throw new Error('Gemini returned no image');
+  return `data:image/png;base64,${b64}`;
+}
+
+async function genImagePollinations(prompt) {
+  /* Pollinations FLUX — free, URL-based, always works */
+  const full = `${prompt}, no text, no letters, no watermarks, no logos, ultra detailed, 8K, cinematic`;
+  const neg  = 'text,letters,watermark,logo,blurry,low quality,ugly,nsfw';
+  const seed = Math.floor(Math.random() * 999999);
+  const url  = `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=1024&height=1280&model=flux-pro&seed=${seed}&nologo=true&nofeed=true&negative=${encodeURIComponent(neg)}`;
+  /* Preload so errors are caught */
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload  = () => resolve(url);
+    img.onerror = () => resolve(url); // resolve anyway — image element will show error state
+    img.src = url;
+    setTimeout(() => resolve(url), 35000); // max wait 35s
+  });
+}
+
+async function generateImage(prompt) {
+  const provider  = getKey('imgProvider') || 'pollinations';
+  const geminiKey = getKey('geminiKey');
+  if (provider === 'gemini' && geminiKey) {
+    try {
+      toast('🎨 Gemini Imagen 3 generating...');
+      return await genImageGemini(prompt, geminiKey);
+    } catch(e) {
+      toast(`⚠️ Gemini failed: ${e.message} — using Pollinations`);
+    }
+  }
+  toast('🎨 Generating image...');
+  return await genImagePollinations(prompt);
+}
+
 /* ─── GENERATE ────────────────────────────────────────────── */
 async function generate() {
   const topic = document.getElementById('topicInput').value.trim();
   if (!topic) { toast('⚠️ Please enter your topic first!'); return; }
 
-  const apiKey = getKey('oai');
+  const apiKey  = getKey('oai');
   if (!apiKey) { toast('⚙️ Add your Groq API key in Settings first!'); openSettings(); return; }
-  const model       = getKey('model') || DEFAULT_MODEL;
-  const backendUrl  = getKey('backend') || DEFAULT_BACKEND;
-  const platforms   = [...activePlatforms];
+  const model     = getKey('model') || DEFAULT_MODEL;
+  const platforms = [...activePlatforms];
+
   const btn = document.getElementById('genBtn');
   btn.disabled = true;
   document.getElementById('genTxt').innerHTML = '<div class="spin"></div>&nbsp;Generating...';
-
-  const results = document.getElementById('results');
-  results.classList.add('show');
+  document.getElementById('results').classList.add('show');
 
   const frame = document.getElementById('posterFrame');
   frame.innerHTML = '<div class="skeleton" style="position:absolute;inset:0;"></div>';
   generatedImageUrl = null;
 
   const capsCol = document.getElementById('capsCol');
-  capsCol.innerHTML = platforms.map(() => `
-    <div class="cap-card glass-card">
-      <div class="cap-body"><div class="skeleton cap-sk"></div></div>
-    </div>`).join('');
+  capsCol.innerHTML = platforms.map(() => `<div class="cap-card glass-card"><div class="cap-body"><div class="skeleton cap-sk"></div></div></div>`).join('');
 
-  let data;
   try {
-    const res = await fetch(`${backendUrl}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, platforms, groq_key: apiKey, model, img_provider: getKey('imgProvider'), gemini_key: getKey('geminiKey'), openai_img_key: getKey('openaiImgKey') })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Backend error ${res.status}`);
-    }
-    data = await res.json();
-  } catch(e) {
-    btn.disabled = false;
-    document.getElementById('genTxt').innerHTML = '✦ Generate';
-    frame.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--red);font-size:12px;padding:24px;text-align:center;gap:10px;">
-      <div>⚠️ Backend not reachable</div>
-      <div style="font-size:10.5px;color:var(--muted-fg);line-height:1.6;">Start the backend:<br><code style="background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;">cd backend && uvicorn main:app --reload</code><br>Then check ⚙ Settings → Backend URL</div>
-    </div>`;
+    /* Step 1 — Groq: design config + captions in parallel */
+    const [designR, capR] = await Promise.allSettled([
+      groqDesign(apiKey, model, topic),
+      groqCaptions(apiKey, model, topic, platforms)
+    ]);
+
+    const design  = designR.status === 'fulfilled' ? designR.value : {};
+    const capData = capR.status   === 'fulfilled' ? capR.value   : {};
+
+    /* Step 2 — Image generation with selected provider */
+    const imagePrompt = design.image_prompt || `premium marketing visual for ${topic}, cinematic, dark luxury, 3D render`;
+    const bgUrl = await generateImage(imagePrompt);
+    generatedImageUrl = bgUrl || 'poster-ready';
+
+    /* Step 3 — Render poster */
+    frame.innerHTML = renderPosterHTML(design, design, bgUrl);
+
+    /* Step 4 — Captions */
     capsCol.innerHTML = '';
+    if (platforms.some(p => capData[p])) {
+      platforms.forEach((p, i) => { if (capData[p]) capsCol.appendChild(makeCap(p, capData[p], i)); });
+    } else {
+      capsCol.innerHTML = `<div class="glass-card" style="padding:20px;color:var(--muted-fg);font-size:13px;">Captions failed — try again.</div>`;
+    }
+
+    const providerLabel = getKey('imgProvider') === 'gemini' ? 'Gemini Imagen 3' : 'Pollinations FLUX';
+    toast(`✦ Done! Image by ${providerLabel}`);
+
+  } catch(e) {
+    frame.innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--red);font-size:13px;padding:24px;text-align:center;">${e.message}</div>`;
     toast('❌ ' + e.message);
-    return;
-  }
-
-  const { poster_content: content, captions: capData, design_config: design, image_url: bgUrl } = data;
-  generatedImageUrl = bgUrl || 'poster-ready';
-
-  // Render poster using template + design config from backend
-  frame.innerHTML = renderPosterHTML(content, design, bgUrl);
-
-  // Captions
-  capsCol.innerHTML = '';
-  if (capData && platforms.some(p => capData[p])) {
-    platforms.forEach((p, i) => {
-      if (capData[p]) capsCol.appendChild(makeCap(p, capData[p], i));
-    });
-  } else {
-    capsCol.innerHTML = `<div class="glass-card" style="padding:20px;color:var(--muted-fg);font-size:13px;">No captions returned — try regenerating.</div>`;
   }
 
   btn.disabled = false;
   document.getElementById('genTxt').innerHTML = '✦ Regenerate';
   const postAllBtn = document.getElementById('postAllBtn');
-  if (postAllBtn) postAllBtn.style.display = capR.status === 'fulfilled' ? 'flex' : 'none';
+  if (postAllBtn) postAllBtn.style.display = 'flex';
   document.getElementById('postResults').innerHTML = '';
-  const providerLabel = { pollinations:'Pollinations', gemini:'Gemini Imagen 3', openai:'DALL-E 3' }[data.provider] || 'AI';
-  toast(`✦ Image by ${providerLabel} — ready!`);
 }
 
-/* ─── AI CALL with auto-retry on 429 ─────────────────────── */
-async function geminiCall(apiKey, body, maxRetries = 4) {
-  let delay = 8000;
+/* ─── GROQ CALL (with 429 retry) ────────────────────────────── */
+async function groqCall(apiKey, body, maxRetries = 3) {
+  let delay = 6000;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const r = await fetch(`${GROQ_API_BASE}/chat/completions`, {
       method: 'POST',
@@ -1095,11 +1131,75 @@ async function geminiCall(apiKey, body, maxRetries = 4) {
     if (r.status === 429 && attempt < maxRetries) {
       toast(`⏳ Rate limit — retrying in ${Math.round(delay/1000)}s...`);
       await new Promise(res => setTimeout(res, delay));
-      delay = Math.min(delay * 2, 60000);
+      delay = Math.min(delay * 2, 30000);
       continue;
     }
     throw new Error(d.error?.message || `Groq error ${r.status}`);
   }
+}
+
+/* ─── GROQ: Design config + image prompt ───────────────────── */
+async function groqDesign(apiKey, model, topic) {
+  const d = await groqCall(apiKey, {
+    model, temperature: 0.9, max_tokens: 800,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: 'You are a senior art director and AI image prompt engineer. Return only valid JSON.' },
+      { role: 'user', content:
+        `Design the visual config for a premium social media marketing poster about: "${topic}"\n\n` +
+        `Return JSON with these keys:\n` +
+        `- "template": "saas"|"cyber-ai"|"corporate"|"minimal"|"glassmorphism"\n` +
+        `- "primary_color": hex color fitting the topic\n` +
+        `- "secondary_color": complementary hex\n` +
+        `- "layout": "left-text"|"right-text"|"bottom-text"|"center-overlay"\n` +
+        `- "headline": ALL CAPS, max 5 words\n` +
+        `- "subheadline": max 8 words\n` +
+        `- "description": 1-2 sentences\n` +
+        `- "points": exactly 4 bullets, max 5 words each\n` +
+        `- "stat": metric like "500+" or "99%"\n` +
+        `- "stat_label": max 4 words\n` +
+        `- "cta": max 5 words\n` +
+        `- "image_prompt": A vivid 100-word paragraph describing a photorealistic 3D rendered scene for "${topic}". ` +
+        `Include: specific subjects (hologram, laptop, device, product), environment, neon lighting, materials, camera angle, cinematic mood. ` +
+        `Style: 8K octane render, Apple advertisement quality. No text, no letters, no logos.`
+      }
+    ]
+  });
+  const raw = d.choices?.[0]?.message?.content?.trim() || '{}';
+  try {
+    const parsed = JSON.parse(raw.replace(/^```json|```$/g,'').trim());
+    return parsed;
+  } catch {
+    return { template:'cyber-ai', primary_color:'#7c3aed', secondary_color:'#22d3ee',
+      layout:'bottom-text', headline: topic.toUpperCase().slice(0,30),
+      subheadline:'Professional. Powerful. Proven.', description:`Discover ${topic}.`,
+      points:['Top Quality','Expert Team','Fast Delivery','Best Value'],
+      stat:'100%', stat_label:'Client Satisfaction', cta:'Get Started Today',
+      image_prompt:`Cinematic 3D render for ${topic}. Glowing hologram, dark luxury studio, neon blue purple lighting, volumetric fog, ultra realistic 8K.`
+    };
+  }
+}
+
+/* ─── GROQ: Social media captions ──────────────────────────── */
+async function groqCaptions(apiKey, model, topic, platforms) {
+  const platList = platforms.join(', ');
+  const rules = platforms.map(p => ({
+    linkedin:  `"linkedin": professional, 5-8 hashtags, max 1300 chars`,
+    instagram: `"instagram": fun, emojis, 15-20 hashtags, max 2000 chars`,
+    facebook:  `"facebook": conversational, 3-5 hashtags, end with question, max 500 chars`
+  }[p])).filter(Boolean).join('\n');
+  const d = await groqCall(apiKey, {
+    model, temperature: 0.8, max_tokens: 2000,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: 'Expert social media copywriter. Return only valid JSON.' },
+      { role: 'user', content: `Write captions for: "${topic}"\nPlatforms: ${platList}\n${rules}\nReturn JSON with keys: ${platList}` }
+    ]
+  });
+  try {
+    const raw = d.choices?.[0]?.message?.content?.trim() || '{}';
+    return JSON.parse(raw.replace(/^```json|```$/g,'').trim());
+  } catch { return {}; }
 }
 
 /* ─── STRIP MARKDOWN ────────────────────────────────────────── */
@@ -1421,17 +1521,10 @@ async function regenerateImage() {
   frame.innerHTML = '<div class="skeleton" style="position:absolute;inset:0;"></div>';
   generatedImageUrl = null;
   try {
-    toast('🎨 Regenerating poster...');
-    const backendUrl = getKey('backend') || DEFAULT_BACKEND;
-    const res = await fetch(`${backendUrl}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, platforms: [...activePlatforms], groq_key: apiKey, model, img_provider: getKey('imgProvider'), gemini_key: getKey('geminiKey'), openai_img_key: getKey('openaiImgKey') })
-    });
-    if (!res.ok) throw new Error(`Backend error ${res.status}`);
-    const data = await res.json();
-    frame.innerHTML = renderPosterHTML(data.poster_content, data.design_config, data.image_url);
-    generatedImageUrl = data.image_url || 'poster-ready';
+    const design = await groqDesign(apiKey, model, topic);
+    const bgUrl  = await generateImage(design.image_prompt || topic);
+    frame.innerHTML = renderPosterHTML(design, design, bgUrl);
+    generatedImageUrl = bgUrl || 'poster-ready';
     toast('🎨 New poster generated!');
   } catch(e) { toast('❌ ' + (e.message || e)); }
 }

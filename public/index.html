@@ -1063,9 +1063,9 @@ async function genPosterDesign(apiKey, model, topic) {
     model, temperature: 0.85, max_tokens: 700,
     response_format: { type: 'json_object' },
     messages: [
-      { role: 'system', content: 'You are a professional marketing art director and AI image prompt engineer. Return only valid JSON.' },
+      { role: 'system', content: 'You are a professional graphic designer and AI image prompt engineer. Return only valid JSON.' },
       { role: 'user', content:
-        `Design a complete social media poster for: "${topic}"\n\n` +
+        `Design a complete social media marketing poster for: "${topic}"\n\n` +
         `Return JSON with exactly these keys:\n` +
         `- "headline": Bold ALL CAPS headline, max 5 words\n` +
         `- "subheadline": Supporting statement, max 8 words\n` +
@@ -1075,9 +1075,18 @@ async function genPosterDesign(apiKey, model, topic) {
         `- "stat_label": Short label for stat, max 4 words\n` +
         `- "cta": Call-to-action button text, max 5 words\n` +
         `- "accent": Hex color that fits the topic theme (e.g. "#7c3aed")\n` +
-        `- "layout": One of "left-text" | "bottom-text" | "right-text" | "center-overlay" — choose the layout that best fits the visual composition\n` +
-        `- "visual_style": One of "dark-gradient" | "neon-glow" | "cinematic" | "minimal-dark" — mood that fits the topic\n` +
-        `- "image_prompt": A professional FLUX image generation prompt (60-80 words, comma-separated tags) describing the FULL poster visual background. Include: specific objects/subjects relevant to ${topic}, composition matching the chosen layout (subject placement opposite to text area), cinematic lighting, color palette matching accent, art style. NO text, NO words, NO letters, NO watermarks in the image.`
+        `- "layout": One of "left-text" | "bottom-text" | "right-text" | "center-overlay" — pick the layout that best fits this topic's visual composition\n` +
+        `- "visual_style": One of "dark-gradient" | "neon-glow" | "cinematic" | "minimal-dark" — the mood that fits the topic\n` +
+        `- "image_prompt": You are a professional graphic designer. Convert the idea into a detailed image generation prompt. Create a COMPLETE premium marketing poster visual (NOT a simple background). Include:\n` +
+        `  * Poster layout and visual hierarchy\n` +
+        `  * Typography style (font mood, weight — but NO actual text/letters in image)\n` +
+        `  * Background style and texture\n` +
+        `  * Specific objects and subjects relevant to "${topic}"\n` +
+        `  * Cinematic lighting direction and quality\n` +
+        `  * Exact color palette with mood\n` +
+        `  * Empty clean areas on the ${'{layout}'} side for text overlay\n` +
+        `  * Premium branding style (luxury, tech, corporate, etc.)\n` +
+        `  Composition must leave deliberate empty space where the HTML text overlay will appear. Output as comma-separated prompt tags, 80-120 words. NO text, NO letters, NO watermarks, NO logos in the image.`
       }
     ]
   });
@@ -1100,10 +1109,10 @@ async function genBgImage(topic, accent, enhancedPrompt) {
   const base = enhancedPrompt
     ? enhancedPrompt
     : `abstract dark background, ${topic}, deep navy blue gradient, glowing bokeh particles, premium cinematic texture, atmospheric, professional`;
-  const desc = encodeURIComponent(`${base}, no text, no words, no letters, no watermark, dark tones`);
-  const neg  = encodeURIComponent('text, words, letters, watermark, bright white background, flat, low quality, blurry, ugly');
+  const desc = encodeURIComponent(`${base}, no text, no words, no letters, no watermark, no logo, no signature`);
+  const neg  = encodeURIComponent('text, words, letters, watermark, logo, signature, brand mark, url, website, copyright, blurry, low quality, ugly, flat, white background');
   const seed = Math.floor(Math.random() * 999999);
-  const url  = `https://image.pollinations.ai/prompt/${desc}?width=1024&height=1280&model=flux-pro&seed=${seed}&nologo=true&negative=${neg}`;
+  const url  = `https://image.pollinations.ai/prompt/${desc}?width=1024&height=1280&model=flux-pro&seed=${seed}&nologo=true&nofeed=true&negative=${neg}`;
   return new Promise(resolve => {
     const img = new Image();
     img.crossOrigin = 'anonymous';

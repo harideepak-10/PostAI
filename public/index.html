@@ -343,13 +343,13 @@
     }
     .results-label em { font-style: normal; color: var(--muted-fg); }
 
-    .results-grid { display: grid; grid-template-columns: 360px 1fr; gap: 22px; }
+    .results-grid { display: grid; grid-template-columns: 300px 1fr; gap: 22px; }
     @media(max-width:860px){ .results-grid { grid-template-columns: 1fr; } }
 
     /* ── POSTER ────────────────────────────────────────────── */
     .poster-panel { display: flex; flex-direction: column; gap: 12px; }
     .poster-frame {
-      aspect-ratio: 1; border-radius: 20px; overflow: hidden;
+      aspect-ratio: 4/5; border-radius: 20px; overflow: hidden;
       position: relative; border: 1px solid var(--bdr);
       background: var(--surface); cursor: pointer; transition: box-shadow 0.3s;
     }
@@ -1104,7 +1104,8 @@ async function genImage(topic, vis, apiKey, model) {
   );
 
   const seed = Math.floor(Math.random() * 999999);
-  const url = `https://image.pollinations.ai/prompt/${finalPrompt}?width=1024&height=1024&model=flux-realism&seed=${seed}&nologo=true&enhance=true&negative=${negative}`;
+  // 4:5 portrait ratio (ideal for Instagram, Facebook, LinkedIn)
+  const url = `https://image.pollinations.ai/prompt/${finalPrompt}?width=1024&height=1280&model=flux&seed=${seed}&nologo=true&enhance=true&negative=${negative}`;
 
   await new Promise((resolve, reject) => {
     const img = new Image();

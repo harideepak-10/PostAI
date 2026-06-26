@@ -985,15 +985,17 @@ async function generate() {
       <div class="cap-body"><div class="skeleton cap-sk"></div></div>
     </div>`).join('');
 
-  // Run poster content + captions in parallel (both Groq), bg image fires independently
-  const [contentR, capR] = await Promise.allSettled([
+  // Run all 3 Groq tasks in parallel: poster content + captions + enhanced image prompt
+  const [contentR, capR, imgPromptR] = await Promise.allSettled([
     genPosterContent(apiKey, model, topic),
-    genCaptions(apiKey, model, topic, DEFAULT_TONE, platforms)
+    genCaptions(apiKey, model, topic, DEFAULT_TONE, platforms),
+    genImagePrompt(apiKey, model, topic)
   ]);
 
-  // Background image from Pollinations (no rate limit, run after Groq calls)
+  // Send enhanced prompt to Pollinations FLUX for a higher-quality background
+  const enhancedPrompt = imgPromptR.status === 'fulfilled' ? imgPromptR.value : null;
   let bgUrl = '';
-  try { bgUrl = await genBgImage(topic, contentR.value?.accent); } catch(e) {}
+  try { bgUrl = await genBgImage(topic, contentR.value?.accent, enhancedPrompt); } catch(e) {}
 
   // Render HTML poster
   if (contentR.status === 'fulfilled') {
@@ -1081,21 +1083,42 @@ async function genPosterContent(apiKey, model, topic) {
   catch { return { headline: topic.toUpperCase().slice(0,30), subheadline:'Professional. Powerful. Proven.', description: topic, points:['Top Quality Results','Expert Team','Fast Delivery','Best Value'], stat:'100%', stat_label:'Client Satisfaction', cta:'Get Started Today', accent:'#7c3aed' }; }
 }
 
-/* ─── BACKGROUND IMAGE: Pollinations ──────────────────────── */
-async function genBgImage(topic, accent) {
-  const desc = encodeURIComponent(
-    `abstract dark background, ${topic}, deep navy blue gradient, glowing bokeh particles, ` +
-    `premium cinematic texture, no text, no letters, atmospheric, professional`
-  );
-  const neg = encodeURIComponent('text, words, letters, watermark, ugly, blurry, low quality');
+/* ─── IMAGE PROMPT ENHANCER: Groq → professional FLUX prompt ─ */
+async function genImagePrompt(apiKey, model, topic) {
+  const d = await geminiCall(apiKey, {
+    model, temperature: 0.8, max_tokens: 200,
+    messages: [
+      { role: 'system', content: 'You are a professional AI image prompt engineer. Output ONLY the image prompt — no explanation, no quotes, no preamble.' },
+      { role: 'user', content:
+        `Write a FLUX image generation prompt for a social media marketing background about: "${topic}"\n\n` +
+        `Requirements:\n` +
+        `- Background image ONLY — absolutely NO text, NO words, NO letters, NO UI elements\n` +
+        `- Dark or deep-toned so white text can be overlaid cleanly\n` +
+        `- Visual subject on right side or center; leave darker space on left and bottom for text overlay\n` +
+        `- Include: specific objects relevant to the topic, cinematic lighting, rich color palette, composition\n` +
+        `- Style: photorealistic 3D render OR dramatic digital art OR cinematic photograph\n` +
+        `- Output: comma-separated tags, max 60 words`
+      }
+    ]
+  });
+  return d.choices?.[0]?.message?.content?.trim() || topic;
+}
+
+/* ─── BACKGROUND IMAGE: Pollinations FLUX ─────────────────── */
+async function genBgImage(topic, accent, enhancedPrompt) {
+  const base = enhancedPrompt
+    ? enhancedPrompt
+    : `abstract dark background, ${topic}, deep navy blue gradient, glowing bokeh particles, premium cinematic texture, atmospheric, professional`;
+  const desc = encodeURIComponent(`${base}, no text, no words, no letters, no watermark, dark tones`);
+  const neg  = encodeURIComponent('text, words, letters, watermark, bright white background, flat, low quality, blurry, ugly');
   const seed = Math.floor(Math.random() * 999999);
-  const url = `https://image.pollinations.ai/prompt/${desc}?width=1024&height=1280&model=flux&seed=${seed}&nologo=true&negative=${neg}`;
+  const url  = `https://image.pollinations.ai/prompt/${desc}?width=1024&height=1280&model=flux-pro&seed=${seed}&nologo=true&negative=${neg}`;
   return new Promise(resolve => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(url);
     img.onerror = () => resolve('');
-    setTimeout(() => resolve(url), 25000);
+    setTimeout(() => resolve(url), 30000);
     img.src = url;
   });
 }

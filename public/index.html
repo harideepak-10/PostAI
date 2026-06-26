@@ -1062,20 +1062,21 @@ async function geminiCall(apiKey, body, maxRetries = 4) {
 async function buildImagePrompt(apiKey, model, topic) {
   try {
     const d = await geminiCall(apiKey, {
-      model, temperature: 0.7, max_tokens: 300,
+      model, temperature: 0.7, max_tokens: 250,
       messages: [
         { role: 'system', content:
-          'You are an expert AI image prompt engineer. Write prompts in English only. Output only the image prompt — no explanation, no quotes, no extra text.'
+          'You are an AI image prompt engineer. Your job is to describe ONLY visual scenes — objects, environments, lighting, colors, mood, and composition. ' +
+          'NEVER mention text, words, labels, signs, banners, captions, typography, or any written content. ' +
+          'Output only the scene description in English. No explanation, no quotes.'
         },
         { role: 'user', content:
-          `Write a highly detailed, vivid image generation prompt for a professional social media poster about: "${topic}"\n\n` +
-          `Rules:\n` +
-          `- English only, no other languages\n` +
-          `- Describe the scene, colors, lighting, mood, composition clearly\n` +
-          `- Photorealistic or high-quality digital art style\n` +
-          `- NO text, NO words, NO letters in the image\n` +
-          `- Cinematic, vibrant, HD quality\n` +
-          `- Max 80 words`
+          `Create a detailed visual scene description for an image about: "${topic}"\n\n` +
+          `STRICT RULES:\n` +
+          `- Describe ONLY physical visual elements: objects, people, environment, sky, light, colors, textures\n` +
+          `- Do NOT mention any text, words, letters, signs, screens with text, labels, or banners\n` +
+          `- Style: cinematic photorealistic digital art, dramatic lighting, vibrant colors\n` +
+          `- Make it visually stunning and directly relevant to the topic\n` +
+          `- Max 60 words`
         }
       ]
     });
@@ -1085,23 +1086,25 @@ async function buildImagePrompt(apiKey, model, topic) {
 
 /* ─── IMAGE: Pollinations.ai ──────────────────────────────── */
 async function genImage(topic, vis, apiKey, model) {
-  // Step 1: Use Gemini to build a rich, accurate image prompt
+  // Step 1: Use Gemini to build a pure visual scene prompt (no text triggers)
   const richPrompt = await buildImagePrompt(apiKey, model, topic);
 
-  // Step 2: Compose final prompt with quality boosters
+  // Step 2: Compose final prompt — NO "poster" framing (it triggers text)
   const finalPrompt = encodeURIComponent(
-    `${richPrompt}, professional social media poster composition, ` +
-    `no text, no words, no letters, English style, ultra HD, 8K resolution, ` +
-    `sharp focus, perfect lighting, vibrant colors, high contrast, photorealistic, masterpiece`
+    `${richPrompt}, ` +
+    `cinematic composition, dramatic lighting, ultra HD, 8K, sharp focus, ` +
+    `vibrant colors, photorealistic, highly detailed, professional photography`
   );
 
+  // Step 3: Strong negative prompt to block any text rendering
   const negative = encodeURIComponent(
-    'text, words, letters, watermark, blurry, low quality, pixelated, distorted, ugly, bad anatomy, duplicate'
+    'text, words, letters, alphabet, typography, font, caption, label, sign, banner, ' +
+    'watermark, writing, handwriting, numbers, symbols, title, heading, logo text, ' +
+    'blurry, low quality, pixelated, distorted, ugly, deformed, duplicate, bad anatomy'
   );
 
   const seed = Math.floor(Math.random() * 999999);
-  // Use flux-pro for best quality
-  const url = `https://image.pollinations.ai/prompt/${finalPrompt}?width=1024&height=1024&model=flux-pro&seed=${seed}&nologo=true&enhance=true&negative=${negative}`;
+  const url = `https://image.pollinations.ai/prompt/${finalPrompt}?width=1024&height=1024&model=flux-realism&seed=${seed}&nologo=true&enhance=true&negative=${negative}`;
 
   await new Promise((resolve, reject) => {
     const img = new Image();

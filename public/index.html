@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PostAI — AI Social Media Creator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── CSS Variables ─────────────────────────────────────── */
+    :root {
+      --background:         201 100% 13%;
+      --foreground:         0 0% 100%;
+      --muted:              0 0% 10%;
+      --muted-foreground:   240 4% 66%;
+      --primary:            0 0% 100%;
+      --primary-foreground: 0 0% 4%;
+      --secondary:          0 0% 10%;
+      --border:             0 0% 18%;
+      --accent:             265 89% 73%;
+
+      --font-display: 'Instrument Serif', serif;
+      --font-body:    'Inter', sans-serif;
+
+      --bg:      hsl(var(--background));
+      --fg:      hsl(var(--foreground));
+      --muted-fg:hsl(var(--muted-foreground));
+      --surface: rgba(255,255,255,0.04);
+      --surface2:rgba(255,255,255,0.07);
+      --bdr:     rgba(255,255,255,0.09);
+      --bdr2:    rgba(255,255,255,0.15);
+      --violet:  #7c5cfc;
+      --pink:    #f472b6;
+      --cyan:    #22d3ee;
+      --green:   #4ade80;
+      --red:     #f87171;
+      --li:      #0a66c2;
+      --ig-grad: linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);
+      --fb:      #1877f2;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Liquid Glass ──────────────────────────────────────── */
+    .liquid-glass {
+      background: rgba(255,255,255,0.01);
+      background-blend-mode: luminosity;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: none;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
+      position: relative;
+      overflow: hidden;
+    }
+    .liquid-glass::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1.4px;
+      background: linear-gradient(180deg,
+        rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%,
+        rgba(255,255,255,0)    40%, rgba(255,255,255,0)    60%,
+        rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    /* ── Animations ────────────────────────────────────────── */
+    @keyframes fade-rise {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spinR { to { transform: rotate(360deg); } }
+    @keyframes corePulse {
+      0%,100% { transform: scale(1);    box-shadow: 0 0 40px rgba(124,92,252,0.7); }
+      50%      { transform: scale(1.12); box-shadow: 0 0 70px rgba(124,92,252,1);   }
+    }
+    @keyframes barFill {
+      0%  { width: 0%;   } 30% { width: 42%; }
+      65% { width: 74%;  } 85% { width: 89%; }
+      100%{ width: 100%; }
+    }
+    @keyframes barGrad  { 0%{background-position:300% 0} 100%{background-position:-300% 0} }
+    @keyframes blink    { 0%,100%{opacity:1} 50%{opacity:0.25} }
+    @keyframes skPulse  { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+    @keyframes gradMove { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+    @keyframes sheen    { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
+
+    .animate-fade-rise         { animation: fade-rise 0.8s ease-out         both; }
+    .animate-fade-rise-d1      { animation: fade-rise 0.8s ease-out 0.2s    both; }
+    .animate-fade-rise-d2      { animation: fade-rise 0.8s ease-out 0.4s    both; }
+    .animate-fade-rise-d3      { animation: fade-rise 0.8s ease-out 0.6s    both; }
+
+    /* ── SPLASH ────────────────────────────────────────────── */
+    #splash {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: var(--bg); gap: 40px;
+      transition: opacity 0.9s ease, transform 0.9s ease;
+    }
+    #splash.hide { opacity: 0; transform: scale(1.05); pointer-events: none; }
+
+    .splash-logo {
+      position: relative; width: 110px; height: 110px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ring {
+      position: absolute; inset: 0; border-radius: 50%;
+      border: 2px solid transparent;
+    }
+    .ring1 { border-top-color: var(--violet); border-right-color: var(--violet); animation: spinR 1.4s linear infinite; }
+    .ring2 { inset: 10px; border-bottom-color: var(--pink); border-left-color: var(--pink); animation: spinR 1s linear infinite reverse; }
+    .ring3 { inset: 22px; border-top-color: var(--cyan); animation: spinR 0.7s linear infinite; }
+    .core {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--violet), var(--pink));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; z-index: 1;
+      animation: corePulse 1.4s ease-in-out infinite;
+      box-shadow: 0 0 40px rgba(124,92,252,0.7);
+    }
+
+    .splash-title {
+      font-family: var(--font-display);
+      font-size: 52px; font-weight: 400; letter-spacing: -1.5px;
+      background: linear-gradient(135deg, var(--violet) 0%, var(--pink) 50%, var(--cyan) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      text-align: center;
+    }
+    .splash-sub { font-size: 15px; color: var(--muted-fg); text-align: center; letter-spacing: 0.3px; }
+    .splash-progress {
+      width: 280px; height: 3px;
+      background: rgba(255,255,255,0.07); border-radius: 99px; overflow: hidden;
+    }
+    .splash-bar {
+      height: 100%; width: 0%; border-radius: 99px;
+      background: linear-gradient(90deg, var(--violet), var(--pink), var(--cyan));
+      background-size: 300% 100%;
+      animation: barFill 2.6s ease forwards, barGrad 1.5s linear infinite;
+    }
+    .splash-status { font-size: 12px; color: var(--muted-fg); letter-spacing: 1.2px; text-transform: uppercase; }
+
+    /* ── APP ───────────────────────────────────────────────── */
+    #app {
+      opacity: 0; transform: translateY(24px);
+      transition: opacity 0.9s ease, transform 0.9s ease;
+      min-height: 100vh;
+    }
+    #app.show { opacity: 1; transform: translateY(0); }
+
+    /* ── HERO SECTION (video bg) ───────────────────────────── */
+    .hero-section {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .hero-video {
+      position: absolute;
+      inset: 0; width: 100%; height: 100%;
+      object-fit: cover; z-index: 0;
+    }
+    .hero-scrim {
+      position: absolute; inset: 0; z-index: 1;
+      background: rgba(2, 37, 52, 0.5);
+    }
+
+
+    /* ── FLOATING SETTINGS ─────────────────────────────────── */
+    .btn-float-settings {
+      position: absolute; top: 24px; right: 28px; z-index: 10;
+      width: 42px; height: 42px; border-radius: 12px;
+      font-size: 18px; color: var(--fg);
+      cursor: pointer; transition: transform 0.2s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .btn-float-settings:hover { transform: scale(1.08) rotate(20deg); }
+
+    /* ── HERO CONTENT ──────────────────────────────────────── */
+    .hero-content {
+      position: relative; z-index: 2;
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 48px 24px;
+    }
+
+    /* ── CREATOR WRAP ──────────────────────────────────────── */
+    .creator-wrap {
+      width: 100%; max-width: 860px;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+    .creator-head {
+      text-align: center; margin-bottom: 8px;
+    }
+    .creator-logo {
+      font-family: var(--font-display);
+      font-size: 36px; font-weight: 400; letter-spacing: -1px;
+      background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .creator-logo sup { font-size: 14px; }
+    .creator-sub {
+      font-size: 14px; color: var(--muted-fg);
+      margin-top: 6px; line-height: 1.6;
+    }
+
+    /* ── GLASS CARD ────────────────────────────────────────── */
+    .glass-card {
+      background: var(--surface);
+      border: 1px solid var(--bdr);
+      border-radius: 22px;
+      backdrop-filter: blur(20px);
+      transition: border-color 0.3s;
+    }
+    .glass-card:hover { border-color: var(--bdr2); }
+
+    /* ── FIELD LABEL ───────────────────────────────────────── */
+    .field-label {
+      font-size: 11px; font-weight: 600; color: var(--muted-fg);
+      text-transform: uppercase; letter-spacing: 1.2px;
+      margin-bottom: 12px;
+    }
+
+    /* ── TOPIC ─────────────────────────────────────────────── */
+    .topic-wrap { padding: 28px 30px; }
+    .topic-box  { position: relative; }
+    .topic-ta {
+      width: 100%; background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 16px;
+      color: var(--fg); font-size: 15px; font-family: var(--font-body);
+      padding: 18px 20px 40px; resize: none; height: 130px; outline: none;
+      transition: border-color 0.25s, box-shadow 0.25s, background 0.25s; line-height: 1.65;
+      overflow-y: auto;
+    }
+    .topic-ta::placeholder { color: rgba(255,255,255,0.22); }
+    .topic-ta:focus {
+      background: rgba(255,255,255,0.09);
+      border-color: rgba(124,92,252,0.6);
+      box-shadow: 0 0 0 4px rgba(124,92,252,0.1), inset 0 1px 1px rgba(255,255,255,0.08);
+    }
+    .topic-ta::-webkit-scrollbar { width: 5px; }
+    .topic-ta::-webkit-scrollbar-track { background: transparent; }
+    .topic-ta::-webkit-scrollbar-thumb { background: rgba(124,92,252,0.4); border-radius: 99px; }
+    .topic-ta::-webkit-scrollbar-thumb:hover { background: rgba(124,92,252,0.7); }
+    .topic-count { position: absolute; bottom: 14px; right: 16px; font-size: 12px; color: var(--muted-fg); pointer-events: none; }
+
+    /* ── DIVIDER ───────────────────────────────────────────── */
+    .div-line { height: 1px; background: var(--bdr); margin: 0 30px; }
+
+    /* ── PLATFORM GRID ─────────────────────────────────────── */
+    .plat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; padding: 24px 30px; }
+    @media(max-width:640px){ .plat-grid { grid-template-columns: 1fr; } }
+
+    .plat-card {
+      border: 1.5px solid var(--bdr); border-radius: 18px; padding: 18px 16px;
+      cursor: pointer; transition: all 0.25s;
+      display: flex; align-items: center; gap: 14px;
+      background: var(--surface); user-select: none; position: relative; overflow: hidden;
+    }
+    .plat-card::after {
+      content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+    }
+    .plat-card.li::after  { background: radial-gradient(circle at 20% 50%, rgba(10,102,194,0.14), transparent 70%); }
+    .plat-card.ig::after  { background: radial-gradient(circle at 20% 50%, rgba(225,48,108,0.14), transparent 70%); }
+    .plat-card.fb::after  { background: radial-gradient(circle at 20% 50%, rgba(24,119,242,0.14), transparent 70%); }
+    .plat-card.active::after { opacity: 1; }
+    .plat-card.active.li { border-color: rgba(10,102,194,0.6); box-shadow: 0 0 24px rgba(10,102,194,0.12); }
+    .plat-card.active.ig { border-color: rgba(225,48,108,0.6); box-shadow: 0 0 24px rgba(225,48,108,0.12); }
+    .plat-card.active.fb { border-color: rgba(24,119,242,0.6); box-shadow: 0 0 24px rgba(24,119,242,0.12); }
+
+    .plat-icon {
+      width: 46px; height: 46px; border-radius: 13px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 800;
+      flex-shrink: 0; color: white; position: relative; z-index: 1;
+    }
+    .plat-icon.li { background: var(--li); }
+    .plat-icon.ig { background: var(--ig-grad); }
+    .plat-icon.fb { background: var(--fb); }
+
+    .plat-info { flex: 1; z-index: 1; }
+    .plat-info strong { display: block; font-size: 14px; font-weight: 600; }
+    .plat-info span   { font-size: 12px; color: var(--muted-fg); }
+    .plat-chk {
+      width: 22px; height: 22px; border-radius: 7px;
+      border: 1.5px solid var(--bdr2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; transition: all 0.2s; flex-shrink: 0; z-index: 1;
+    }
+    .plat-card.active .plat-chk { background: var(--violet); border-color: var(--violet); box-shadow: 0 0 12px rgba(124,92,252,0.5); }
+
+    /* ── GENERATE BUTTON ───────────────────────────────────── */
+    .gen-wrap { padding: 0 30px 30px; margin-top: 16px; }
+    .btn-gen {
+      width: 100%; padding: 20px; border: none; border-radius: 18px;
+      font-size: 16px; font-weight: 600; font-family: var(--font-body);
+      cursor: pointer; position: relative; overflow: hidden;
+      color: white; letter-spacing: 0.3px;
+      background: linear-gradient(135deg, var(--violet) 0%, #c084fc 50%, var(--pink) 100%);
+      background-size: 250% 250%;
+      animation: gradMove 4s ease infinite;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+    .btn-gen::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.18) 50%,transparent 100%);
+      transform: translateX(-100%); animation: sheen 2.8s ease infinite;
+    }
+    .btn-gen:hover { transform: translateY(-3px); box-shadow: 0 20px 50px rgba(124,92,252,0.4); }
+    .btn-gen:active { transform: translateY(0); }
+    .btn-gen:disabled {
+      opacity: 0.55; cursor: not-allowed; transform: none !important;
+      box-shadow: none !important; animation: none;
+      background: linear-gradient(135deg,rgba(124,92,252,0.4),rgba(192,132,252,0.4));
+    }
+
+    /* ── RESULTS ───────────────────────────────────────────── */
+    #results { display: none; flex-direction: column; gap: 24px; }
+    #results.show { display: flex; animation: fade-rise 0.6s ease both; }
+
+    .results-label {
+      font-family: var(--font-display);
+      font-size: 22px; font-weight: 400; letter-spacing: -0.5px;
+      color: rgba(255,255,255,0.8);
+    }
+    .results-label em { font-style: normal; color: var(--muted-fg); }
+
+    .results-grid { display: grid; grid-template-columns: 360px 1fr; gap: 22px; }
+    @media(max-width:860px){ .results-grid { grid-template-columns: 1fr; } }
+
+    /* ── POSTER ────────────────────────────────────────────── */
+    .poster-panel { display: flex; flex-direction: column; gap: 12px; }
+    .poster-frame {
+      aspect-ratio: 1; border-radius: 20px; overflow: hidden;
+      position: relative; border: 1px solid var(--bdr);
+      background: var(--surface); cursor: pointer; transition: box-shadow 0.3s;
+    }
+    .poster-frame:hover { box-shadow: 0 0 0 2px var(--violet); }
+    .poster-frame img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s ease; }
+    .poster-frame:hover img { transform: scale(1.04); }
+    .poster-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.75), transparent 55%);
+      opacity: 0; transition: opacity 0.3s;
+      display: flex; align-items: flex-end; justify-content: center; padding-bottom: 22px;
+    }
+    .poster-frame:hover .poster-overlay { opacity: 1; }
+    .poster-overlay span {
+      font-size: 13px; font-weight: 600; color: white;
+      background: rgba(255,255,255,0.15); padding: 9px 22px;
+      border-radius: 99px; backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .skeleton {
+      width: 100%; height: 100%;
+      background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 50%, var(--surface) 100%);
+      background-size: 300% 300%;
+      animation: skPulse 2s ease infinite;
+    }
+    .poster-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn-act {
+      padding: 11px; background: var(--surface); border: 1px solid var(--bdr);
+      border-radius: 12px; color: var(--muted-fg); font-size: 13px;
+      font-family: var(--font-body); cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+    }
+    .btn-act:hover { border-color: var(--violet); color: var(--violet); background: rgba(124,92,252,0.06); }
+
+    /* ── POST ALL BUTTON ───────────────────────────────────── */
+    .btn-post-all {
+      width: 100%; padding: 18px; border: none; border-radius: 18px;
+      font-size: 15px; font-weight: 600; font-family: var(--font-body);
+      cursor: pointer; color: white; letter-spacing: 0.3px;
+      background: linear-gradient(135deg, #0a66c2 0%, #cc2366 50%, #1877f2 100%);
+      background-size: 250% 250%;
+      animation: gradMove 5s ease infinite;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: transform 0.25s, box-shadow 0.25s;
+      position: relative; overflow: hidden;
+    }
+    .btn-post-all::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.15) 50%,transparent 100%);
+      transform: translateX(-100%); animation: sheen 3s ease infinite;
+    }
+    .btn-post-all:hover { transform: translateY(-3px); box-shadow: 0 20px 50px rgba(10,102,194,0.4); }
+    .btn-post-all:active { transform: translateY(0); }
+    .btn-post-all:disabled { opacity: 0.55; cursor: not-allowed; transform: none !important; box-shadow: none !important; animation: none; }
+
+    .plat-post-result {
+      display: flex; align-items: center; gap: 8px; padding: 10px 16px;
+      border-radius: 12px; font-size: 13px; font-weight: 500;
+      border: 1px solid var(--bdr);
+    }
+    .plat-post-result.ing { background: rgba(124,92,252,0.08); color: var(--violet); border-color: rgba(124,92,252,0.25); }
+    .plat-post-result.ok  { background: rgba(74,222,128,0.08); color: var(--green); border-color: rgba(74,222,128,0.25); }
+    .plat-post-result.err { background: rgba(248,113,113,0.08); color: var(--red); border-color: rgba(248,113,113,0.25); }
+
+    /* ── CAPTION CARDS ─────────────────────────────────────── */
+    .captions-col { display: flex; flex-direction: column; gap: 14px; }
+    .cap-card {
+      background: var(--surface); border: 1px solid var(--bdr);
+      border-radius: 20px; overflow: hidden; transition: border-color 0.25s;
+      animation: fade-rise 0.5s ease both;
+    }
+    .cap-card:hover { border-color: var(--bdr2); }
+    .cap-head {
+      display: flex; align-items: center; gap: 10px; padding: 17px 22px;
+      border-bottom: 1px solid var(--bdr); cursor: pointer;
+    }
+    .cap-ico {
+      width: 34px; height: 34px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 800; color: white; flex-shrink: 0;
+    }
+    .cap-ico.li { background: var(--li); }
+    .cap-ico.ig { background: var(--ig-grad); }
+    .cap-ico.fb { background: var(--fb); }
+    .cap-name { font-size: 14px; font-weight: 600; flex: 1; }
+    .cap-len  { font-size: 12px; color: var(--muted-fg); }
+    .cap-chev { font-size: 11px; color: var(--muted-fg); transition: transform 0.3s; }
+    .cap-card.collapsed .cap-chev { transform: rotate(-90deg); }
+    .cap-body { padding: 18px 22px; }
+    .cap-card.collapsed .cap-body { display: none; }
+    .cap-ta {
+      width: 100%; background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
+      color: var(--fg); font-size: 13px; font-family: var(--font-body);
+      padding: 14px 16px; resize: none; min-height: 126px; max-height: 280px; outline: none;
+      line-height: 1.75; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+      overflow-y: auto;
+    }
+    .cap-ta:focus {
+      background: rgba(255,255,255,0.09);
+      border-color: rgba(124,92,252,0.5);
+      box-shadow: 0 0 0 3px rgba(124,92,252,0.08), inset 0 1px 1px rgba(255,255,255,0.07);
+    }
+    .cap-ta::-webkit-scrollbar { width: 4px; }
+    .cap-ta::-webkit-scrollbar-track { background: transparent; }
+    .cap-ta::-webkit-scrollbar-thumb { background: rgba(124,92,252,0.4); border-radius: 99px; }
+    .cap-ta::-webkit-scrollbar-thumb:hover { background: rgba(124,92,252,0.65); }
+    .cap-foot { display: flex; align-items: center; gap: 9px; margin-top: 12px; }
+    .btn-cpy {
+      padding: 10px 14px; background: var(--surface2); border: 1px solid var(--bdr);
+      border-radius: 11px; color: var(--muted-fg); font-size: 13px;
+      font-family: var(--font-body); cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .btn-cpy:hover { color: var(--fg); border-color: var(--bdr2); }
+    .post-badge {
+      margin-left: auto; padding: 5px 14px; border-radius: 99px;
+      font-size: 11px; font-weight: 700; display: none;
+    }
+    .post-badge.show { display: inline-flex; align-items: center; gap: 5px; }
+    .post-badge.ok  { background: rgba(74,222,128,0.1); color: var(--green); border: 1px solid rgba(74,222,128,0.22); }
+    .post-badge.err { background: rgba(248,113,113,0.1); color: var(--red);   border: 1px solid rgba(248,113,113,0.22); }
+    .post-badge.ing { background: rgba(124,92,252,0.1); color: var(--violet); border: 1px solid rgba(124,92,252,0.22); }
+    .cap-sk { height: 140px; border-radius: 14px; }
+
+    /* ── SETTINGS MODAL ────────────────────────────────────── */
+    .modal-bg {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(16px);
+      z-index: 999;
+      display: flex; align-items: center; justify-content: flex-end;
+      opacity: 0; pointer-events: none; transition: opacity 0.35s;
+    }
+    .modal-bg.show { opacity: 1; pointer-events: all; }
+    .modal {
+      background: hsl(201 80% 9%);
+      border-left: 1px solid var(--bdr2);
+      width: 100%; max-width: 420px;
+      height: 100vh; overflow-y: auto;
+      padding: 0;
+      transform: translateX(40px);
+      transition: transform 0.38s cubic-bezier(0.22,1,0.36,1);
+      box-shadow: -24px 0 80px rgba(0,0,0,0.6);
+      display: flex; flex-direction: column;
+    }
+    .modal-bg.show .modal { transform: translateX(0); }
+
+    /* Modal header */
+    .modal-head {
+      padding: 28px 28px 20px;
+      border-bottom: 1px solid var(--bdr);
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+      position: sticky; top: 0;
+      background: hsl(201 80% 9%);
+      z-index: 1;
+    }
+    .modal-head-text h2 {
+      font-family: var(--font-display);
+      font-size: 22px; font-weight: 400; letter-spacing: -0.5px; margin-bottom: 4px;
+    }
+    .modal-head-text p { font-size: 12px; color: var(--muted-fg); line-height: 1.5; }
+    .btn-close {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--surface); border: 1px solid var(--bdr);
+      color: var(--muted-fg); font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; flex-shrink: 0;
+    }
+    .btn-close:hover { background: var(--surface2); color: var(--fg); }
+
+    /* Modal sections */
+    .modal-body { padding: 24px 28px; flex: 1; display: flex; flex-direction: column; gap: 28px; }
+    .modal-section-title {
+      font-size: 10px; font-weight: 700; color: var(--violet);
+      text-transform: uppercase; letter-spacing: 1.5px;
+      margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+    }
+    .modal-section-title::after {
+      content: ''; flex: 1; height: 1px; background: var(--bdr);
+    }
+
+    .mf { margin-bottom: 14px; }
+    .mf label {
+      display: block; font-size: 11px; font-weight: 600; color: var(--muted-fg);
+      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 7px;
+    }
+    .mf input, .mf select {
+      width: 100%; background: rgba(255,255,255,0.04); border: 1px solid var(--bdr);
+      border-radius: 10px; color: var(--fg); font-size: 13px;
+      font-family: var(--font-body); padding: 11px 14px; outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s; appearance: none;
+    }
+    .mf input:focus, .mf select:focus {
+      border-color: var(--violet);
+      box-shadow: 0 0 0 3px rgba(124,92,252,0.1);
+    }
+    .mf input::placeholder { color: rgba(255,255,255,0.15); }
+    .mf-hint { font-size: 11px; color: var(--muted-fg); margin-top: 5px; line-height: 1.5; }
+    .mf-hint a { color: #c084fc; text-decoration: none; }
+    .mf-hint a:hover { text-decoration: underline; }
+
+    /* Modal footer */
+    .modal-foot {
+      padding: 20px 28px 28px;
+      border-top: 1px solid var(--bdr);
+      display: flex; gap: 10px;
+      position: sticky; bottom: 0;
+      background: hsl(201 80% 9%);
+    }
+    .btn-msave {
+      flex: 1; padding: 13px;
+      background: linear-gradient(135deg, var(--violet), #c084fc);
+      border: none; border-radius: 12px; color: white; font-size: 14px; font-weight: 600;
+      font-family: var(--font-body); cursor: pointer; transition: all 0.2s;
+    }
+    .btn-msave:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,92,252,0.35); }
+    .btn-mcancel {
+      padding: 13px 20px; background: var(--surface); border: 1px solid var(--bdr);
+      border-radius: 12px; color: var(--muted-fg); font-size: 14px;
+      font-family: var(--font-body); cursor: pointer; transition: all 0.2s;
+    }
+    .btn-mcancel:hover { color: var(--fg); border-color: var(--bdr2); }
+
+    /* ── TOAST ─────────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 34px; left: 50%;
+      transform: translateX(-50%) translateY(18px);
+      opacity: 0; background: rgba(2,37,52,0.96);
+      border: 1px solid var(--bdr2); border-radius: 16px;
+      padding: 14px 26px; font-size: 14px; font-weight: 500; color: var(--fg);
+      z-index: 9999; pointer-events: none; backdrop-filter: blur(24px);
+      transition: all 0.38s cubic-bezier(0.34,1.56,0.64,1);
+      display: flex; align-items: center; gap: 10px;
+      white-space: nowrap; box-shadow: 0 16px 50px rgba(0,0,0,0.55);
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── SPINNER ───────────────────────────────────────────── */
+    .spin {
+      width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white; border-radius: 50%; animation: spinR 0.75s linear infinite;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       RESPONSIVE — TABLET  (max 768px)
+    ══════════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      /* Splash */
+      .splash-title { font-size: 38px; }
+      .splash-progress { width: 220px; }
+
+      /* Hero / creator */
+      .hero-content { padding: 56px 16px 32px; justify-content: flex-start; }
+      .creator-wrap { gap: 16px; }
+      .creator-logo { font-size: 28px; }
+      .creator-sub  { font-size: 13px; }
+
+      /* Glass card internals */
+      .topic-wrap   { padding: 20px 18px; }
+      .topic-ta     { font-size: 14px; height: 110px; padding: 14px 16px; }
+      .div-line     { margin: 0 18px; }
+      .plat-grid    { grid-template-columns: 1fr; gap: 10px; padding: 18px 18px; }
+      .gen-wrap     { padding: 0 18px 22px; }
+      .btn-gen      { padding: 16px; font-size: 15px; }
+
+      /* Platform cards compact */
+      .plat-card    { padding: 14px 12px; }
+      .plat-icon    { width: 38px; height: 38px; font-size: 15px; }
+      .plat-info strong { font-size: 13px; }
+
+      /* Results */
+      .results-grid { grid-template-columns: 1fr; gap: 16px; }
+      .results-label { font-size: 18px; }
+
+      /* Caption cards */
+      .cap-head  { padding: 14px 16px; }
+      .cap-body  { padding: 14px 16px; }
+      .btn-cpy   { flex: 1; justify-content: center; }
+      .post-badge{ width: 100%; justify-content: center; margin-left: 0; }
+
+      /* Settings panel full width on mobile */
+      .modal     { max-width: 100%; border-left: none; border-top: 1px solid var(--bdr2); }
+      .modal-bg  { align-items: flex-end; }
+
+      /* Toast */
+      #toast { font-size: 13px; padding: 12px 18px; white-space: normal; max-width: 90vw; text-align: center; }
+
+      /* Floating settings */
+      .btn-float-settings { top: 16px; right: 16px; width: 38px; height: 38px; font-size: 16px; }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       RESPONSIVE — MOBILE  (max 480px)
+    ══════════════════════════════════════════════════════════ */
+    @media (max-width: 480px) {
+      /* Splash */
+      .splash-logo  { width: 80px; height: 80px; }
+      .ring2        { inset: 8px; }
+      .ring3        { inset: 18px; }
+      .core         { width: 32px; height: 32px; font-size: 16px; }
+      .splash-title { font-size: 32px; letter-spacing: -1px; }
+      .splash-sub   { font-size: 13px; }
+      .splash-progress { width: 180px; }
+
+      /* Creator */
+      .creator-logo { font-size: 24px; }
+      .creator-sub  { font-size: 12px; }
+      .hero-content { padding: 48px 12px 24px; }
+      .creator-wrap { gap: 12px; }
+
+      /* Cards */
+      .glass-card   { border-radius: 16px; }
+      .topic-wrap   { padding: 16px 14px; }
+      .topic-ta     { height: 100px; font-size: 14px; padding: 12px 14px; border-radius: 12px; }
+      .div-line     { margin: 0 14px; }
+      .plat-grid    { padding: 14px 14px; gap: 8px; }
+      .gen-wrap     { padding: 0 14px 18px; }
+      .btn-gen      { padding: 15px; font-size: 14px; border-radius: 14px; }
+
+      /* Platform compact */
+      .plat-card    { padding: 12px 10px; border-radius: 14px; }
+      .plat-icon    { width: 34px; height: 34px; font-size: 14px; border-radius: 10px; }
+      .plat-info strong { font-size: 12px; }
+      .plat-info span   { font-size: 11px; }
+      .plat-chk     { width: 18px; height: 18px; font-size: 10px; }
+
+      /* Results */
+      .results-label { font-size: 16px; }
+      .poster-btns   { grid-template-columns: 1fr 1fr; }
+      .btn-act       { padding: 9px; font-size: 12px; }
+
+      /* Caption cards */
+      .cap-ico  { width: 28px; height: 28px; font-size: 12px; border-radius: 8px; }
+      .cap-name { font-size: 13px; }
+      .cap-ta   { font-size: 12px; min-height: 100px; padding: 12px 14px; }
+      .btn-cpy  { font-size: 11px; padding: 8px 10px; }
+    }
+
+  </style>
+</head>
+<body>
+
+<!-- ─── SPLASH ────────────────────────────────────────────── -->
+<div id="splash">
+  <div class="splash-logo">
+    <div class="ring ring1"></div>
+    <div class="ring ring2"></div>
+    <div class="ring ring3"></div>
+    <div class="core">✦</div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+    <div class="splash-title">PostAI</div>
+    <div class="splash-sub">AI Social Media Creator</div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+    <div class="splash-progress"><div class="splash-bar"></div></div>
+    <div class="splash-status" id="splashStatus">Initializing engine...</div>
+  </div>
+</div>
+
+<!-- ─── APP ───────────────────────────────────────────────── -->
+<div id="app">
+
+  <!-- ══ HERO + CREATE ════════════════════════════════════════ -->
+  <section class="hero-section">
+
+    <!-- Video Background -->
+    <video class="hero-video" autoplay loop muted playsinline>
+      <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" type="video/mp4" />
+    </video>
+    <div class="hero-scrim"></div>
+
+    <!-- Floating settings button -->
+    <button class="btn-float-settings liquid-glass" onclick="openSettings()">⚙</button>
+
+    <!-- Main creation UI centered on video -->
+    <div class="hero-content" id="create">
+      <div class="creator-wrap animate-fade-rise">
+
+        <!-- Card header -->
+        <div class="creator-head">
+          <span class="creator-logo">PostAI<sup>®</sup></span>
+          <p class="creator-sub">Turn any idea into a poster — ready to post everywhere.</p>
+        </div>
+
+      <!-- Input card -->
+      <div class="glass-card">
+        <div class="topic-wrap">
+          <div class="field-label">✍ What's your post about?</div>
+          <div class="topic-box">
+            <textarea class="topic-ta" id="topicInput"
+              placeholder="e.g. We just launched our AI productivity app — sharing the story and what makes it special..."></textarea>
+          </div>
+        </div>
+
+        <div class="div-line"></div>
+
+        <div style="padding:20px 30px 4px;">
+          <div class="field-label">📱 Target Platforms</div>
+        </div>
+        <div class="plat-grid">
+          <div class="plat-card li active" id="plt-linkedin" onclick="togglePlat(this,'linkedin')">
+            <div class="plat-icon li">in</div>
+            <div class="plat-info"><strong>LinkedIn</strong><span>Professional network</span></div>
+            <div class="plat-chk">✓</div>
+          </div>
+          <div class="plat-card ig active" id="plt-instagram" onclick="togglePlat(this,'instagram')">
+            <div class="plat-icon ig">📷</div>
+            <div class="plat-info"><strong>Instagram</strong><span>Photo &amp; Stories</span></div>
+            <div class="plat-chk">✓</div>
+          </div>
+          <div class="plat-card fb active" id="plt-facebook" onclick="togglePlat(this,'facebook')">
+            <div class="plat-icon fb" style="font-size:22px;">f</div>
+            <div class="plat-info"><strong>Facebook</strong><span>Social community</span></div>
+            <div class="plat-chk">✓</div>
+          </div>
+        </div>
+
+        <div class="gen-wrap">
+          <button class="btn-gen" id="genBtn" onclick="generate()">
+            <span id="genTxt">✦ Generate Poster &amp; Captions</span>
+          </button>
+        </div>
+      </div>
+
+        <!-- Results -->
+        <div id="results">
+          <div class="results-label">Your <em>generated content</em></div>
+          <div class="results-grid">
+            <div class="poster-panel">
+              <div class="poster-frame" id="posterFrame" onclick="downloadImage()">
+                <div class="skeleton" id="posterSk"></div>
+                <div class="poster-overlay"><span>⬇ Download</span></div>
+              </div>
+              <div class="poster-btns">
+                <button class="btn-act" onclick="regenerateImage()">🔄 Regenerate</button>
+                <button class="btn-act" onclick="downloadImage()">⬇ Download</button>
+              </div>
+            </div>
+            <div class="captions-col" id="capsCol"></div>
+          </div>
+          <!-- Single unified Post button (shown after generation) -->
+          <button class="btn-post-all" id="postAllBtn" onclick="postAll()" style="display:none;">
+            <span id="postAllTxt">🚀 Post to Selected Platforms</span>
+          </button>
+          <div id="postResults" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;"></div>
+        </div>
+
+      </div><!-- /creator-wrap -->
+    </div><!-- /hero-content -->
+  </section>
+
+
+</div><!-- /app -->
+
+<!-- ─── SETTINGS MODAL ────────────────────────────────────── -->
+<div class="modal-bg" id="modal" onclick="if(event.target===this)closeSettings()">
+  <div class="modal" onclick="event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="modal-head">
+      <div class="modal-head-text">
+        <h2>Settings</h2>
+        <p>Keys are saved locally — never sent to any third party.</p>
+      </div>
+      <button class="btn-close" onclick="closeSettings()">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="modal-body">
+
+      <!-- AI Engine -->
+      <div>
+        <div class="modal-section-title">AI Engine</div>
+        <div class="mf">
+          <label>Groq API Key</label>
+          <input type="password" id="kOAI" placeholder="gsk_..."/>
+          <div class="mf-hint">Get a free key at <a href="https://console.groq.com" target="_blank">console.groq.com</a></div>
+        </div>
+        <div class="mf">
+          <label>Model</label>
+          <select id="kModel">
+            <option value="llama-3.3-70b-versatile">Llama 3.3 70B — Best quality</option>
+            <option value="llama-3.1-8b-instant">Llama 3.1 8B — Fastest</option>
+            <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+            <option value="gemma2-9b-it">Gemma 2 9B</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- LinkedIn -->
+      <div>
+        <div class="modal-section-title">LinkedIn</div>
+        <div class="mf">
+          <label>Access Token</label>
+          <input type="password" id="kLI" placeholder="AQX..."/>
+        </div>
+        <div class="mf">
+          <label>Person URN</label>
+          <input type="text" id="kLIUrn" placeholder="urn:li:person:XXXXXXX"/>
+        </div>
+      </div>
+
+      <!-- Facebook -->
+      <div>
+        <div class="modal-section-title">Facebook</div>
+        <div class="mf">
+          <label>Page Access Token</label>
+          <input type="password" id="kFB" placeholder="EAA..."/>
+        </div>
+        <div class="mf">
+          <label>Page ID</label>
+          <input type="text" id="kFBPage" placeholder="123456789"/>
+        </div>
+      </div>
+
+      <!-- Instagram -->
+      <div>
+        <div class="modal-section-title">Instagram</div>
+        <div class="mf">
+          <label>Business Account ID</label>
+          <input type="text" id="kIG" placeholder="17841..."/>
+          <div class="mf-hint">Connect your Instagram Business account via Facebook.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="modal-foot">
+      <button class="btn-mcancel" onclick="closeSettings()">Cancel</button>
+      <button class="btn-msave" onclick="saveSettings()">Save Settings</button>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ─── SPLASH ──────────────────────────────────────────────── */
+const msgs = ['Initializing engine...','Loading AI models...','Warming up Groq...','Almost ready...'];
+let mi = 0;
+const sEl = document.getElementById('splashStatus');
+const si = setInterval(() => { sEl.textContent = msgs[Math.min(++mi, msgs.length-1)]; }, 620);
+
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    clearInterval(si);
+    document.getElementById('splash').classList.add('hide');
+    document.getElementById('app').classList.add('show');
+  }, 2800);
+});
+
+/* ─── STATE ───────────────────────────────────────────────── */
+const DEFAULT_TONE  = 'professional';
+const DEFAULT_STYLE = 'modern and vibrant';
+let activePlatforms = new Set(['linkedin','instagram','facebook']);
+let generatedImageUrl = null;
+
+/* ─── SETTINGS ────────────────────────────────────────────── */
+const DEFAULT_GROQ_KEY = ''; // Add your Groq key in ⚙ Settings
+const DEFAULT_MODEL    = 'llama-3.3-70b-versatile';
+const KEYS = { kOAI:'oai', kModel:'model', kLI:'li', kLIUrn:'liUrn', kFB:'fb', kFBPage:'fbPage', kIG:'ig' };
+
+const getKey = k => localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : '');
+
+function openSettings() {
+  Object.entries(KEYS).forEach(([id, k]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : '');
+  });
+  document.getElementById('modal').classList.add('show');
+}
+function closeSettings() { document.getElementById('modal').classList.remove('show'); }
+function saveSettings() {
+  Object.entries(KEYS).forEach(([id, k]) => {
+    const el = document.getElementById(id);
+    if (el) localStorage.setItem('pk_'+k, el.value.trim());
+  });
+  closeSettings();
+  toast('✅ Settings saved!');
+}
+
+/* ─── SELECTIONS ──────────────────────────────────────────── */
+function togglePlat(card, id) {
+  if (activePlatforms.has(id)) {
+    if (activePlatforms.size === 1) { toast('⚠️ Keep at least one platform'); return; }
+    activePlatforms.delete(id);
+    card.classList.remove('active');
+    card.querySelector('.plat-chk').textContent = '';
+  } else {
+    activePlatforms.add(id);
+    card.classList.add('active');
+    card.querySelector('.plat-chk').textContent = '✓';
+  }
+}
+
+/* ─── TOAST ───────────────────────────────────────────────── */
+let tTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.innerHTML = `<span>${msg}</span>`;
+  el.classList.add('show');
+  clearTimeout(tTimer);
+  tTimer = setTimeout(() => el.classList.remove('show'), 3400);
+}
+
+/* ─── GENERATE ────────────────────────────────────────────── */
+async function generate() {
+  const topic = document.getElementById('topicInput').value.trim();
+  if (!topic) { toast('⚠️ Please enter your topic first!'); return; }
+
+  const apiKey = getKey('oai');
+  if (!apiKey) { toast('⚙️ Add your Groq API key in Settings first!'); openSettings(); return; }
+  const model  = getKey('model') || DEFAULT_MODEL;
+  const platforms = [...activePlatforms];
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true;
+  document.getElementById('genTxt').innerHTML = '<div class="spin"></div>&nbsp;Generating...';
+
+  const results = document.getElementById('results');
+  results.classList.add('show');
+  document.getElementById('posterSk').style.cssText = 'display:block;width:100%;height:100%;';
+  const oldImg = document.getElementById('posterFrame').querySelector('img');
+  if (oldImg) oldImg.remove();
+  generatedImageUrl = null;
+
+  const capsCol = document.getElementById('capsCol');
+  capsCol.innerHTML = platforms.map(() => `
+    <div class="cap-card glass-card">
+      <div class="cap-body"><div class="skeleton cap-sk"></div></div>
+    </div>`).join('');
+
+  const [imgR, capR] = await Promise.allSettled([
+    genImage(topic, DEFAULT_STYLE),
+    genCaptions(apiKey, model, topic, DEFAULT_TONE, platforms)
+  ]);
+
+  // Poster
+  const frame = document.getElementById('posterFrame');
+  document.getElementById('posterSk').style.display = 'none';
+  if (imgR.status === 'fulfilled') {
+    generatedImageUrl = imgR.value;
+    const img = document.createElement('img');
+    img.src = imgR.value; img.alt = 'Generated poster';
+    img.style.animation = 'fade-rise 0.6s ease both';
+    frame.insertBefore(img, frame.firstChild);
+  } else {
+    toast('❌ Image failed: ' + imgR.reason);
+    document.getElementById('posterSk').style.display = 'block';
+  }
+
+  // Captions
+  capsCol.innerHTML = '';
+  if (capR.status === 'fulfilled') {
+    platforms.forEach((p, i) => {
+      if (capR.value[p]) capsCol.appendChild(makeCap(p, capR.value[p], i));
+    });
+  } else {
+    const errMsg = capR.reason?.message || String(capR.reason) || 'Unknown error';
+    console.error('Caption generation failed:', capR.reason);
+    capsCol.innerHTML = `<div class="glass-card" style="padding:20px;color:var(--red);font-size:13px;line-height:1.6">
+      ⚠️ Captions failed: ${errMsg}<br>
+      <span style="color:var(--muted-fg);font-size:12px;margin-top:6px;display:block">Check ⚙ Settings → your Groq API key</span>
+    </div>`;
+    toast('❌ ' + errMsg);
+  }
+
+  btn.disabled = false;
+  document.getElementById('genTxt').innerHTML = '✦ Regenerate';
+  // Show/hide the Post All button
+  const postAllBtn = document.getElementById('postAllBtn');
+  if (postAllBtn) postAllBtn.style.display = capR.status === 'fulfilled' ? 'flex' : 'none';
+  document.getElementById('postResults').innerHTML = '';
+  toast('✦ Content ready — review and post below!');
+}
+
+/* ─── IMAGE: Pollinations.ai ──────────────────────────────── */
+async function genImage(topic, vis) {
+  const prompt = encodeURIComponent(
+    `Professional eye-catching social media poster for: "${topic}". Style: ${vis}. No text overlays. Highly detailed, vibrant, cinematic quality.`
+  );
+  const seed = Math.floor(Math.random() * 999999);
+  const url = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=1024&seed=${seed}&nologo=true&enhance=true`;
+  await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload  = resolve;
+    img.onerror = () => reject('Image generation failed');
+    img.src = url;
+  });
+  return url;
+}
+
+/* ─── CAPTIONS: Groq ──────────────────────────────────────── */
+async function genCaptions(apiKey, model, topic, t, platforms) {
+  const platList = platforms.join(', ');
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model, temperature: 0.8, max_tokens: 2048,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content:
+          'You are an expert social media copywriter. Always respond with valid JSON only — no markdown, no explanation, no code fences.'
+        },
+        { role: 'user', content:
+          `Write engaging social media captions for the following topic: "${topic}"\n\n` +
+          `Create captions ONLY for these platforms: ${platList}\n\n` +
+          `Requirements:\n` +
+          (platforms.includes('linkedin')  ? `- "linkedin": professional tone, line breaks for readability, 5-8 relevant hashtags, max 1300 chars\n` : '') +
+          (platforms.includes('instagram') ? `- "instagram": fun & visual, emojis throughout the text, 15-20 hashtags at the very end, max 2000 chars\n` : '') +
+          (platforms.includes('facebook')  ? `- "facebook": conversational & friendly, 3-5 hashtags, end with a question to boost engagement, max 500 chars\n` : '') +
+          `\nRespond with a single JSON object with keys: ${platList}. Values are the caption strings.`
+        }
+      ]
+    })
+  });
+
+  const d = await r.json();
+  if (!r.ok) {
+    const msg = d.error?.message || `Groq error ${r.status}`;
+    console.error('Groq error:', d);
+    throw new Error(msg);
+  }
+
+  let content = d.choices?.[0]?.message?.content?.trim() || '';
+  // Strip accidental markdown fences
+  content = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch(e) {
+    console.error('JSON parse failed:', content);
+    throw new Error('Caption parsing failed — unexpected AI response format');
+  }
+
+  // Validate at least one platform key exists
+  const hasAny = platforms.some(p => parsed[p]);
+  if (!hasAny) {
+    console.error('No platform keys in response:', parsed);
+    throw new Error('AI did not return captions for selected platforms');
+  }
+
+  return parsed;
+}
+
+/* ─── CAPTION CARD ────────────────────────────────────────── */
+function makeCap(platform, text, idx) {
+  const cfg = {
+    linkedin:  { label:'LinkedIn',  cls:'li', icon:'in', btnLabel:'Post to LinkedIn'  },
+    instagram: { label:'Instagram', cls:'ig', icon:'📷', btnLabel:'Post to Instagram' },
+    facebook:  { label:'Facebook',  cls:'fb', icon:'f',  btnLabel:'Post to Facebook'  },
+  }[platform];
+  const div = document.createElement('div');
+  div.className = 'cap-card glass-card';
+  div.style.animationDelay = (idx * 0.1) + 's';
+  div.innerHTML = `
+    <div class="cap-head" onclick="this.parentElement.classList.toggle('collapsed')">
+      <div class="cap-ico ${cfg.cls}">${cfg.icon}</div>
+      <div class="cap-name">${cfg.label}</div>
+      <div class="cap-len" id="cl-${platform}">${text.length} chars</div>
+      <div class="cap-chev">▾</div>
+    </div>
+    <div class="cap-body">
+      <textarea class="cap-ta" id="cap-${platform}"
+        oninput="document.getElementById('cl-${platform}').textContent=this.value.length+' chars'"
+      >${text}</textarea>
+      <div class="cap-foot">
+        <button class="btn-cpy" onclick="copyCaption('${platform}')">📋 Copy Caption</button>
+        <span class="post-badge" id="badge-${platform}"></span>
+      </div>
+    </div>`;
+  return div;
+}
+
+function copyCaption(p) {
+  const v = document.getElementById('cap-' + p)?.value;
+  if (!v) return;
+  navigator.clipboard.writeText(v).then(() => toast('📋 Copied!'));
+}
+
+async function regenerateImage() {
+  const topic = document.getElementById('topicInput').value.trim();
+  if (!topic) { toast('⚠️ Enter a topic first'); return; }
+  const frame = document.getElementById('posterFrame');
+  const img = frame.querySelector('img'); if (img) img.remove();
+  const sk = document.getElementById('posterSk');
+  sk.style.cssText = 'display:block;width:100%;height:100%;';
+  generatedImageUrl = null;
+  try {
+    generatedImageUrl = await genImage(topic, DEFAULT_STYLE);
+    sk.style.display = 'none';
+    const ni = document.createElement('img');
+    ni.src = generatedImageUrl; ni.alt = 'Poster';
+    ni.style.animation = 'fade-rise 0.6s ease both';
+    frame.insertBefore(ni, frame.firstChild);
+    toast('🎨 New poster generated!');
+  } catch(e) { toast('❌ ' + e); }
+}
+
+function downloadImage() {
+  if (!generatedImageUrl) { toast('⚠️ Generate a poster first'); return; }
+  const a = document.createElement('a');
+  a.href = generatedImageUrl; a.download = 'postai-poster.png'; a.target = '_blank'; a.click();
+}
+
+/* ─── POST ALL ────────────────────────────────────────────── */
+async function postAll() {
+  const platforms = [...activePlatforms].filter(p => document.getElementById('cap-' + p));
+  if (!platforms.length) { toast('⚠️ No captions to post'); return; }
+
+  const btn = document.getElementById('postAllBtn');
+  const txt = document.getElementById('postAllTxt');
+  btn.disabled = true;
+  txt.innerHTML = '<div class="spin"></div>&nbsp;Posting to all platforms...';
+
+  const container = document.getElementById('postResults');
+  container.style.display = 'flex';
+  container.innerHTML = platforms.map(p =>
+    `<div class="plat-post-result ing" id="pr-${p}">⏳ ${p.charAt(0).toUpperCase()+p.slice(1)}...</div>`
+  ).join('');
+
+  await Promise.all(platforms.map(async p => {
+    const el = document.getElementById('pr-' + p);
+    const label = p.charAt(0).toUpperCase() + p.slice(1);
+    try {
+      await postTo(p, true);
+      el.className = 'plat-post-result ok';
+      el.textContent = '✅ ' + label + ' posted!';
+    } catch(e) {
+      el.className = 'plat-post-result err';
+      el.textContent = '❌ ' + label + ': ' + e.message;
+    }
+  }));
+
+  btn.disabled = false;
+  txt.innerHTML = '🚀 Post to Selected Platforms';
+  toast('🎉 Done posting!');
+}
+
+/* ─── POST TO PLATFORMS ───────────────────────────────────── */
+async function postTo(p, silent = false) {
+  const cap = document.getElementById('cap-' + p)?.value;
+  if (!cap) return;
+  if (p === 'linkedin')  await postLinkedIn(cap);
+  if (p === 'facebook')  await postFacebook(cap);
+  if (p === 'instagram') await postInstagram(cap);
+}
+
+async function postLinkedIn(caption) {
+  const token = getKey('li'), urn = getKey('liUrn');
+  if (!token || !urn) throw new Error('LinkedIn keys not set in ⚙ Settings');
+  const r = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', 'X-Restli-Protocol-Version': '2.0.0' },
+    body: JSON.stringify({ author: urn, lifecycleState: 'PUBLISHED',
+      specificContent: { 'com.linkedin.ugc.ShareContent': { shareCommentary: { text: caption }, shareMediaCategory: 'NONE' } },
+      visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' } })
+  });
+  if (!r.ok) { const d = await r.json(); throw new Error(d.message || 'LinkedIn error'); }
+}
+
+async function postFacebook(caption) {
+  const token = getKey('fb'), pageId = getKey('fbPage');
+  if (!token || !pageId) throw new Error('Facebook keys not set in ⚙ Settings');
+  const url = generatedImageUrl
+    ? `https://graph.facebook.com/v19.0/${pageId}/photos`
+    : `https://graph.facebook.com/v19.0/${pageId}/feed`;
+  const payload = generatedImageUrl
+    ? { url: generatedImageUrl, caption, access_token: token }
+    : { message: caption, access_token: token };
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!r.ok) { const d = await r.json(); throw new Error(d.error?.message || 'Facebook error'); }
+}
+
+async function postInstagram(caption) {
+  const token = getKey('fb'), igId = getKey('ig');
+  if (!token || !igId) throw new Error('Instagram keys not set in ⚙ Settings');
+  if (!generatedImageUrl) throw new Error('Instagram requires an image — generate one first');
+  const cR = await fetch(`https://graph.facebook.com/v19.0/${igId}/media`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image_url: generatedImageUrl, caption, access_token: token })
+  });
+  const cD = await cR.json();
+  if (!cR.ok) throw new Error(cD.error?.message || 'Container error');
+  for (let i = 0; i < 10; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const sR = await fetch(`https://graph.facebook.com/v19.0/${cD.id}?fields=status_code&access_token=${token}`);
+    const sD = await sR.json();
+    if (sD.status_code === 'FINISHED') break;
+    if (sD.status_code === 'ERROR') throw new Error('Instagram processing failed');
+  }
+  const pR = await fetch(`https://graph.facebook.com/v19.0/${igId}/media_publish`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ creation_id: cD.id, access_token: token })
+  });
+  if (!pR.ok) { const d = await pR.json(); throw new Error(d.error?.message || 'Publish error'); }
+}
+</script>
+</body>
+</html>

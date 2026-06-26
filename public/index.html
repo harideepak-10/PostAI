@@ -1016,7 +1016,7 @@ async function generate() {
     console.error('Caption generation failed:', capR.reason);
     capsCol.innerHTML = `<div class="glass-card" style="padding:20px;color:var(--red);font-size:13px;line-height:1.6">
       ⚠️ Captions failed: ${errMsg}<br>
-      <span style="color:var(--muted-fg);font-size:12px;margin-top:6px;display:block">Check ⚙ Settings → your Groq API key</span>
+      <span style="color:var(--muted-fg);font-size:12px;margin-top:6px;display:block">Check ⚙ Settings → your Google AI Studio API key</span>
     </div>`;
     toast('❌ ' + errMsg);
   }
@@ -1063,7 +1063,7 @@ async function buildImagePrompt(apiKey, model, topic) {
 
 /* ─── IMAGE: Pollinations.ai ──────────────────────────────── */
 async function genImage(topic, vis, apiKey, model) {
-  // Step 1: Use Groq to build a rich, accurate image prompt
+  // Step 1: Use Gemini to build a rich, accurate image prompt
   const richPrompt = await buildImagePrompt(apiKey, model, topic);
 
   // Step 2: Compose final prompt with quality boosters
@@ -1117,8 +1117,8 @@ async function genCaptions(apiKey, model, topic, t, platforms) {
 
   const d = await r.json();
   if (!r.ok) {
-    const msg = d.error?.message || `Groq error ${r.status}`;
-    console.error('Groq error:', d);
+    const msg = d.error?.message || `Gemini error ${r.status}`;
+    console.error('Gemini error:', d);
     throw new Error(msg);
   }
 

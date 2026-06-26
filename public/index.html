@@ -782,8 +782,8 @@
           <div class="results-label">Your <em>generated content</em></div>
           <div class="results-grid">
             <div class="poster-panel">
-              <div class="poster-frame" id="posterFrame" onclick="downloadImage()">
-                <div class="poster-overlay"><span>⬇ Download</span></div>
+              <div class="poster-frame" id="posterFrame" onclick="openPosterInTab()">
+                <div class="poster-overlay"><span>↗ Open in new tab</span></div>
               </div>
               <div class="poster-btns">
                 <button class="btn-act" onclick="regenerateImage()">🔄 Regenerate</button>
@@ -985,22 +985,22 @@ async function generate() {
       <div class="cap-body"><div class="skeleton cap-sk"></div></div>
     </div>`).join('');
 
-  // Run all 3 Groq tasks in parallel: poster content + captions + enhanced image prompt
-  const [contentR, capR, imgPromptR] = await Promise.allSettled([
-    genPosterContent(apiKey, model, topic),
-    genCaptions(apiKey, model, topic, DEFAULT_TONE, platforms),
-    genImagePrompt(apiKey, model, topic)
+  // Run 2 parallel Groq calls: full poster design spec + captions
+  const [designR, capR] = await Promise.allSettled([
+    genPosterDesign(apiKey, model, topic),
+    genCaptions(apiKey, model, topic, DEFAULT_TONE, platforms)
   ]);
 
-  // Send enhanced prompt to Pollinations FLUX for a higher-quality background
-  const enhancedPrompt = imgPromptR.status === 'fulfilled' ? imgPromptR.value : null;
+  // Use Groq's generated image_prompt to create the FLUX background
   let bgUrl = '';
-  try { bgUrl = await genBgImage(topic, contentR.value?.accent, enhancedPrompt); } catch(e) {}
+  if (designR.status === 'fulfilled') {
+    try { bgUrl = await genBgImage(topic, designR.value.accent, designR.value.image_prompt); } catch(e) {}
+  }
 
-  // Render HTML poster
-  if (contentR.status === 'fulfilled') {
-    frame.innerHTML = renderPosterHTML(contentR.value, bgUrl);
-    generatedImageUrl = bgUrl || 'poster-ready'; // used for social posting
+  // Render poster using Groq's layout + visual_style decisions
+  if (designR.status === 'fulfilled') {
+    frame.innerHTML = renderPosterHTML(designR.value, bgUrl);
+    generatedImageUrl = bgUrl || 'poster-ready';
   } else {
     frame.innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--red);font-size:13px;padding:20px;text-align:center;">Poster failed — try again</div>`;
   }
@@ -1057,51 +1057,42 @@ async function geminiCall(apiKey, body, maxRetries = 4) {
   }
 }
 
-/* ─── POSTER CONTENT: Groq ─────────────────────────────────── */
-async function genPosterContent(apiKey, model, topic) {
+/* ─── POSTER DESIGN: Groq (content + layout + image prompt) ── */
+async function genPosterDesign(apiKey, model, topic) {
   const d = await geminiCall(apiKey, {
-    model, temperature: 0.8, max_tokens: 500,
+    model, temperature: 0.85, max_tokens: 700,
     response_format: { type: 'json_object' },
     messages: [
-      { role: 'system', content: 'You are a professional marketing designer and copywriter. Return only valid JSON.' },
+      { role: 'system', content: 'You are a professional marketing art director and AI image prompt engineer. Return only valid JSON.' },
       { role: 'user', content:
-        `Create social media poster content for: "${topic}"\n\n` +
+        `Design a complete social media poster for: "${topic}"\n\n` +
         `Return JSON with exactly these keys:\n` +
         `- "headline": Bold ALL CAPS headline, max 5 words\n` +
         `- "subheadline": Supporting statement, max 8 words\n` +
-        `- "description": 1-2 sentence description of the topic\n` +
-        `- "points": Array of exactly 4 short bullet points, max 5 words each\n` +
-        `- "stat": Impressive number or metric (e.g. "500+", "99%", "10X")\n` +
-        `- "stat_label": Short label for the stat, max 4 words\n` +
+        `- "description": 1-2 sentence description\n` +
+        `- "points": Array of exactly 4 bullet points, max 5 words each\n` +
+        `- "stat": Impressive metric (e.g. "500+", "99%", "10X")\n` +
+        `- "stat_label": Short label for stat, max 4 words\n` +
         `- "cta": Call-to-action button text, max 5 words\n` +
-        `- "accent": Hex color code fitting the topic (e.g. "#7c3aed")`
+        `- "accent": Hex color that fits the topic theme (e.g. "#7c3aed")\n` +
+        `- "layout": One of "left-text" | "bottom-text" | "right-text" | "center-overlay" — choose the layout that best fits the visual composition\n` +
+        `- "visual_style": One of "dark-gradient" | "neon-glow" | "cinematic" | "minimal-dark" — mood that fits the topic\n` +
+        `- "image_prompt": A professional FLUX image generation prompt (60-80 words, comma-separated tags) describing the FULL poster visual background. Include: specific objects/subjects relevant to ${topic}, composition matching the chosen layout (subject placement opposite to text area), cinematic lighting, color palette matching accent, art style. NO text, NO words, NO letters, NO watermarks in the image.`
       }
     ]
   });
   const raw = d.choices?.[0]?.message?.content?.trim() || '{}';
   try { return JSON.parse(raw); }
-  catch { return { headline: topic.toUpperCase().slice(0,30), subheadline:'Professional. Powerful. Proven.', description: topic, points:['Top Quality Results','Expert Team','Fast Delivery','Best Value'], stat:'100%', stat_label:'Client Satisfaction', cta:'Get Started Today', accent:'#7c3aed' }; }
-}
-
-/* ─── IMAGE PROMPT ENHANCER: Groq → professional FLUX prompt ─ */
-async function genImagePrompt(apiKey, model, topic) {
-  const d = await geminiCall(apiKey, {
-    model, temperature: 0.8, max_tokens: 200,
-    messages: [
-      { role: 'system', content: 'You are a professional AI image prompt engineer. Output ONLY the image prompt — no explanation, no quotes, no preamble.' },
-      { role: 'user', content:
-        `Write a FLUX image generation prompt for a social media marketing background about: "${topic}"\n\n` +
-        `Requirements:\n` +
-        `- Background image ONLY — absolutely NO text, NO words, NO letters, NO UI elements\n` +
-        `- Dark or deep-toned so white text can be overlaid cleanly\n` +
-        `- Visual subject on right side or center; leave darker space on left and bottom for text overlay\n` +
-        `- Include: specific objects relevant to the topic, cinematic lighting, rich color palette, composition\n` +
-        `- Style: photorealistic 3D render OR dramatic digital art OR cinematic photograph\n` +
-        `- Output: comma-separated tags, max 60 words`
-      }
-    ]
-  });
-  return d.choices?.[0]?.message?.content?.trim() || topic;
+  catch { return {
+    headline: topic.toUpperCase().slice(0,30),
+    subheadline: 'Professional. Powerful. Proven.',
+    description: topic,
+    points: ['Top Quality Results','Expert Team','Fast Delivery','Best Value'],
+    stat: '100%', stat_label: 'Client Satisfaction',
+    cta: 'Get Started Today', accent: '#7c3aed',
+    layout: 'bottom-text', visual_style: 'dark-gradient',
+    image_prompt: `dark atmospheric background, ${topic}, cinematic lighting, deep blue tones, professional, no text`
+  }; }
 }
 
 /* ─── BACKGROUND IMAGE: Pollinations FLUX ─────────────────── */
@@ -1126,247 +1117,159 @@ async function genBgImage(topic, accent, enhancedPrompt) {
 /* ─── STRIP MARKDOWN FROM TEXT ─────────────────────────────── */
 function clean(s){ return (s||'').replace(/\*\*/g,'').replace(/\*/g,'').replace(/#{1,6}\s?/g,'').replace(/`/g,'').trim(); }
 
-/* ─── RENDER POSTER HTML ───────────────────────────────────── */
+/* ─── RENDER POSTER HTML (AI-driven dynamic layout) ─────────── */
 function renderPosterHTML(c, bgUrl) {
   const accent = c.accent || '#7c3aed';
+  const layout = c.layout || 'bottom-text';
+  const vStyle = c.visual_style || 'dark-gradient';
+
   const hex = accent.replace('#','');
-  const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
-  const aa = (a) => `rgba(${r},${g},${b},${a})`;
-  const pts = (c.points||[]).slice(0,4);
-  const icons = ['🎯','⚡','💡','🚀'];
+  const cr = parseInt(hex.slice(0,2),16), cg = parseInt(hex.slice(2,4),16), cb = parseInt(hex.slice(4,6),16);
+  const aa = (a) => `rgba(${cr},${cg},${cb},${a})`;
+
   const headline    = clean(c.headline    || '');
   const subheadline = clean(c.subheadline || '');
   const description = clean(c.description || '');
-  const stat        = clean(c.stat        || '');
-  const stat_label  = clean(c.stat_label  || '');
-  const cta         = clean(c.cta         || 'Get Started Today');
-  const bg = bgUrl ? `<img src="${bgUrl}" crossorigin="anonymous" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;">` : '';
+  const pts   = (c.points||[]).slice(0,4);
+  const stat       = clean(c.stat       || '');
+  const stat_label = clean(c.stat_label || '');
+  const cta        = clean(c.cta        || 'Get Started Today');
+  const icons = ['🎯','⚡','💡','🚀'];
 
-  const tpl = Math.floor(Math.random() * 4);
+  /* ── background image ── */
+  const bgImg = bgUrl
+    ? `<img src="${bgUrl}" crossorigin="anonymous" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;">`
+    : `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#030b1a,#0d0520,#030b1a);z-index:0;"></div>`;
 
-  /* ── SHARED KEYFRAMES ── */
+  /* ── overlay gradient — darkens the side where text lives ── */
+  const overlays = {
+    'left-text':      `linear-gradient(90deg,rgba(3,7,20,0.97) 0%,rgba(3,7,20,0.93) 42%,rgba(3,7,20,0.35) 68%,transparent 100%)`,
+    'right-text':     `linear-gradient(270deg,rgba(3,7,20,0.97) 0%,rgba(3,7,20,0.93) 42%,rgba(3,7,20,0.35) 68%,transparent 100%)`,
+    'bottom-text':    `linear-gradient(to top,rgba(3,7,20,0.99) 0%,rgba(3,7,20,0.96) 38%,rgba(3,7,20,0.5) 60%,transparent 100%)`,
+    'center-overlay': `linear-gradient(170deg,rgba(3,7,20,0.82) 0%,rgba(10,4,35,0.70) 50%,rgba(3,7,20,0.88) 100%)`,
+  };
+  const overlayGrad = overlays[layout] || overlays['bottom-text'];
+
+  /* ── visual-style extra decoration ── */
+  const decorations = {
+    'dark-gradient': `
+      <div style="position:absolute;top:-100px;right:-80px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,${aa(0.45)},transparent 65%);z-index:2;animation:pOrb 7s ease-in-out infinite;"></div>
+      <div style="position:absolute;bottom:-60px;left:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(0,180,255,0.2),transparent 65%);z-index:2;animation:pOrb 9s ease-in-out infinite reverse;"></div>
+      <div style="position:absolute;inset:0;z-index:1;background-image:radial-gradient(circle,rgba(255,255,255,0.07) 1px,transparent 1px);background-size:28px 28px;animation:pGrid 6s ease infinite;"></div>`,
+    'neon-glow': `
+      <div style="position:absolute;top:10%;left:50%;transform:translateX(-50%);width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,${aa(0.35)},transparent 60%);z-index:2;animation:pOrb 5s ease-in-out infinite;filter:blur(2px);"></div>
+      <div style="position:absolute;bottom:-20px;right:-20px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(0,230,255,0.25),transparent 65%);z-index:2;animation:pOrb 8s ease-in-out infinite reverse;"></div>
+      <div style="position:absolute;inset:0;z-index:1;background:repeating-linear-gradient(0deg,transparent,transparent 39px,${aa(0.04)} 40px);pointer-events:none;"></div>`,
+    'cinematic': `
+      <div style="position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,transparent,${accent},${aa(0.6)},transparent);z-index:3;"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;height:6px;background:linear-gradient(90deg,transparent,${accent},${aa(0.6)},transparent);z-index:3;"></div>
+      <div style="position:absolute;top:20px;left:20px;width:40px;height:40px;border-top:2px solid ${aa(0.7)};border-left:2px solid ${aa(0.7)};z-index:4;"></div>
+      <div style="position:absolute;top:20px;right:20px;width:40px;height:40px;border-top:2px solid ${aa(0.7)};border-right:2px solid ${aa(0.7)};z-index:4;"></div>
+      <div style="position:absolute;bottom:20px;left:20px;width:40px;height:40px;border-bottom:2px solid ${aa(0.7)};border-left:2px solid ${aa(0.7)};z-index:4;"></div>
+      <div style="position:absolute;bottom:20px;right:20px;width:40px;height:40px;border-bottom:2px solid ${aa(0.7)};border-right:2px solid ${aa(0.7)};z-index:4;"></div>`,
+    'minimal-dark': `
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${accent};z-index:3;"></div>
+      <div style="position:absolute;inset:0;z-index:1;background-image:linear-gradient(${aa(0.06)} 1px,transparent 1px),linear-gradient(90deg,${aa(0.06)} 1px,transparent 1px);background-size:40px 40px;"></div>`,
+  };
+  const decor = decorations[vStyle] || decorations['dark-gradient'];
+
+  /* ── text panel & content ── */
+  const isCenter  = layout === 'center-overlay';
+  const isLeft    = layout === 'left-text';
+  const isRight   = layout === 'right-text';
+  const isBottom  = layout === 'bottom-text';
+
+  const textAlign = isCenter ? 'center' : 'left';
+  const alignSelf = isCenter ? 'center' : 'flex-start';
+
+  const panelStyle = {
+    'left-text':      'position:absolute;left:0;top:0;width:54%;height:100%;z-index:5;display:flex;flex-direction:column;justify-content:center;padding:32px 20px 32px 28px;',
+    'right-text':     'position:absolute;right:0;top:0;width:54%;height:100%;z-index:5;display:flex;flex-direction:column;justify-content:center;padding:32px 28px 32px 20px;',
+    'bottom-text':    'position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;flex-direction:column;justify-content:flex-end;padding:18px 26px 32px;',
+    'center-overlay': 'position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:32px 26px;text-align:center;',
+  }[layout];
+
+  /* badge / accent line above headline */
+  const badge = `<div style="display:inline-flex;align-items:center;gap:6px;background:${aa(0.18)};border:1px solid ${aa(0.5)};border-radius:20px;padding:4px 12px;margin-bottom:12px;align-self:${alignSelf};">
+    <div style="width:7px;height:7px;border-radius:50%;background:${accent};box-shadow:0 0 8px ${accent};animation:pPulse 2s ease-in-out infinite;"></div>
+    <span style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${accent};">PostAI</span>
+  </div>`;
+
+  /* headline */
+  const headlineEl = `<div style="font-size:${isBottom?'22px':'26px'};font-weight:900;letter-spacing:-0.5px;line-height:1.1;color:#fff;margin-bottom:8px;text-shadow:0 2px 20px rgba(0,0,0,0.8);${isCenter?'text-align:center;':''}">
+    ${headline}
+  </div>`;
+
+  /* subheadline */
+  const subEl = `<div style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.75);margin-bottom:${isBottom?'10px':'14px'};letter-spacing:0.3px;${isCenter?'text-align:center;':''}">
+    ${subheadline}
+  </div>`;
+
+  /* accent divider */
+  const divider = `<div style="width:44px;height:3px;border-radius:2px;background:linear-gradient(90deg,${accent},${aa(0.3)});margin-bottom:${isBottom?'10px':'14px'};${isCenter?'margin-left:auto;margin-right:auto;':''}animation:pPulse 2.5s ease-in-out infinite;"></div>`;
+
+  /* points — show fewer in bottom layout to save space */
+  const maxPts = isBottom ? 2 : 4;
+  const ptEls = pts.slice(0,maxPts).map((p,i) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;animation:pFade 0.5s ease both;animation-delay:${0.1+i*0.08}s;">
+      <div style="width:20px;height:20px;border-radius:6px;background:${aa(0.25)};border:1px solid ${aa(0.4)};display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;">${icons[i]}</div>
+      <span style="font-size:11px;color:rgba(255,255,255,0.85);font-weight:500;">${clean(p)}</span>
+    </div>`).join('');
+
+  /* stat block */
+  const statEl = stat ? `
+    <div style="display:inline-flex;flex-direction:column;align-items:${isCenter?'center':'flex-start'};background:${aa(0.15)};border:1px solid ${aa(0.4)};border-radius:12px;padding:10px 16px;margin-bottom:14px;">
+      <span style="font-size:28px;font-weight:900;color:${accent};line-height:1;text-shadow:0 0 20px ${aa(0.6)};">${stat}</span>
+      <span style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:2px;letter-spacing:0.5px;">${stat_label}</span>
+    </div>` : '';
+
+  /* description */
+  const descEl = (!isBottom && description) ? `<p style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.5;margin-bottom:14px;${isCenter?'text-align:center;max-width:260px;':''}">${description}</p>` : '';
+
+  /* CTA button */
+  const ctaEl = `<div style="display:inline-flex;align-items:center;gap:8px;background:${accent};border-radius:24px;padding:10px 20px;font-size:11px;font-weight:700;color:#fff;letter-spacing:0.5px;box-shadow:0 4px 20px ${aa(0.5)};position:relative;overflow:hidden;align-self:${alignSelf};">
+    <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);animation:pSheen 2.5s ease infinite;"></span>
+    ${cta} →
+  </div>`;
+
+  /* logo mark */
+  const logo = `<div style="position:absolute;${isRight?'left':'right'}:20px;top:20px;z-index:6;font-size:9px;font-weight:800;letter-spacing:2px;color:${aa(0.6)};text-transform:uppercase;">PostAI</div>`;
+
+  /* stat in corner for layouts that have space */
+  const cornerStat = (isLeft || isRight) && stat ? `
+    <div style="position:absolute;${isLeft?'right':'left'}:20px;bottom:28px;z-index:5;text-align:center;">
+      <div style="font-size:30px;font-weight:900;color:${accent};text-shadow:0 0 24px ${aa(0.7)};line-height:1;">${stat}</div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.55);letter-spacing:0.5px;margin-top:2px;">${stat_label}</div>
+    </div>` : '';
+
+  /* ── assemble panel content ── */
+  let panelInner = '';
+  if (isBottom) {
+    panelInner = badge + headlineEl + subEl + divider + ptEls + ctaEl;
+  } else if (isCenter) {
+    panelInner = badge + headlineEl + subEl + divider + (stat ? statEl : '') + descEl + ptEls + ctaEl;
+  } else {
+    // left or right
+    panelInner = badge + headlineEl + subEl + divider + descEl + ptEls + ctaEl;
+  }
+
+  /* ── keyframes ── */
   const kf = `<style>
     @keyframes pOrb{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-14px) scale(1.06)}}
-    @keyframes pPulse{0%,100%{box-shadow:0 0 20px ${aa(0.4)}}50%{box-shadow:0 0 45px ${aa(0.9)}}}
+    @keyframes pPulse{0%,100%{box-shadow:0 0 12px ${aa(0.3)}}50%{box-shadow:0 0 32px ${aa(0.8)}}}
     @keyframes pSheen{0%{transform:translateX(-120%) rotate(30deg)}100%{transform:translateX(300%) rotate(30deg)}}
-    @keyframes pSpin{to{transform:rotate(360deg)}}
-    @keyframes pFade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes pGrid{0%,100%{opacity:0.05}50%{opacity:0.11}}
-    @keyframes pBar{from{width:0}to{width:100%}}
+    @keyframes pFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pGrid{0%,100%{opacity:0.05}50%{opacity:0.12}}
   </style>`;
 
-  /* ══════════════════════════════════════════════════
-     TEMPLATE 0 — "Nexora Style" (professional split)
-  ══════════════════════════════════════════════════ */
-  if (tpl === 0) return kf + `
-  <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;background:#030b1a;overflow:hidden;color:#fff;">
-    ${bg}
-    <div style="position:absolute;inset:0;background:linear-gradient(170deg,rgba(3,11,26,0.96) 0%,rgba(10,4,35,0.85) 60%,rgba(3,11,26,0.97) 100%);z-index:1;"></div>
-    <!-- dot grid -->
-    <div style="position:absolute;inset:0;z-index:1;background-image:radial-gradient(circle,rgba(255,255,255,0.1) 1px,transparent 1px);background-size:26px 26px;animation:pGrid 5s ease infinite;"></div>
-    <!-- glow orbs -->
-    <div style="position:absolute;top:-100px;right:-80px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,${aa(0.4)},transparent 65%);z-index:2;animation:pOrb 7s ease-in-out infinite;"></div>
-    <div style="position:absolute;bottom:-80px;left:-50px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(0,200,255,0.25),transparent 65%);z-index:2;animation:pOrb 9s ease-in-out infinite reverse;"></div>
-    <!-- top bar -->
-    <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,${accent},#00d4ff,${accent});z-index:5;"></div>
-    <!-- corner brackets -->
-    <div style="position:absolute;top:12px;left:12px;width:22px;height:22px;border-top:2.5px solid ${aa(0.7)};border-left:2.5px solid ${aa(0.7)};z-index:5;border-radius:3px 0 0 0;"></div>
-    <div style="position:absolute;bottom:12px;right:12px;width:22px;height:22px;border-bottom:2.5px solid ${aa(0.7)};border-right:2.5px solid ${aa(0.7)};z-index:5;border-radius:0 0 3px 0;"></div>
-    <!-- content -->
-    <div style="position:relative;z-index:3;padding:28px 26px;display:flex;flex-direction:column;height:100%;box-sizing:border-box;">
-      <!-- header -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,${accent},#00d4ff);display:flex;align-items:center;justify-content:center;font-size:18px;animation:pPulse 3s ease infinite;">✦</div>
-          <div><div style="font-size:14px;font-weight:800;">PostAI</div><div style="font-size:8px;color:rgba(255,255,255,0.35);letter-spacing:2px;text-transform:uppercase;">AI Generated</div></div>
-        </div>
-        <div style="background:${aa(0.15)};border:1px solid ${aa(0.4)};border-radius:99px;padding:5px 14px;font-size:9px;font-weight:700;letter-spacing:1.5px;color:${accent};text-transform:uppercase;">New Post</div>
-      </div>
-      <!-- headline -->
-      <div style="font-size:34px;font-weight:900;line-height:1.05;letter-spacing:-1.5px;text-transform:uppercase;color:#fff;margin-bottom:6px;animation:pFade 0.6s ease both;">${headline}</div>
-      <div style="font-size:16px;font-weight:700;color:${accent};margin-bottom:10px;">${subheadline}</div>
-      <!-- desc with left border -->
-      <div style="font-size:11px;color:rgba(255,255,255,0.55);line-height:1.8;margin-bottom:16px;padding-left:12px;border-left:3px solid ${accent};">${description}</div>
-      <!-- divider -->
-      <div style="height:1px;background:linear-gradient(90deg,${aa(0.6)},transparent);margin-bottom:14px;"></div>
-      <!-- 2×2 icon cards -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
-        ${pts.map((p,i)=>`<div style="background:rgba(255,255,255,0.04);border:1px solid ${aa(0.2)};border-radius:12px;padding:11px 12px;display:flex;align-items:center;gap:9px;position:relative;overflow:hidden;">
-          <div style="position:absolute;inset:0;background:linear-gradient(135deg,${aa(0.1)},transparent);"></div>
-          <div style="width:30px;height:30px;border-radius:9px;background:${aa(0.25)};border:1px solid ${aa(0.4)};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${icons[i]}</div>
-          <div style="font-size:10px;font-weight:600;color:rgba(255,255,255,0.88);line-height:1.3;">${clean(p)}</div>
-        </div>`).join('')}
-      </div>
-      <!-- stat banner -->
-      <div style="margin-top:auto;background:linear-gradient(135deg,${aa(0.2)},rgba(0,212,255,0.15));border:1px solid ${aa(0.35)};border-radius:16px;padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:12px;overflow:hidden;position:relative;">
-        <div style="position:absolute;inset:0;overflow:hidden;"><div style="position:absolute;top:-50%;width:40%;height:200%;background:rgba(255,255,255,0.05);transform:rotate(25deg);animation:pSheen 4s ease-in-out infinite;left:-10%;"></div></div>
-        <div style="text-align:center;flex:1;border-right:1px solid rgba(255,255,255,0.1);padding-right:14px;">
-          <div style="font-size:36px;font-weight:900;color:${accent};letter-spacing:-2px;line-height:1;">${stat}</div>
-          <div style="font-size:9px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">${stat_label}</div>
-        </div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:5px;">
-          ${['Trusted Worldwide','Proven Results','Expert Quality'].map((l,i)=>`<div style="display:flex;align-items:center;gap:7px;"><div style="width:5px;height:5px;border-radius:50%;background:${['#4ade80',accent,'#00d4ff'][i]};flex-shrink:0;"></div><div style="font-size:9.5px;color:rgba(255,255,255,0.6);">${l}</div></div>`).join('')}
-        </div>
-      </div>
-      <!-- CTA -->
-      <div style="background:linear-gradient(135deg,${accent},#00d4ff);border-radius:13px;padding:15px;text-align:center;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;position:relative;overflow:hidden;">
-        <div style="position:absolute;inset:0;overflow:hidden;"><div style="position:absolute;top:-50%;width:30%;height:200%;background:rgba(255,255,255,0.2);transform:rotate(25deg);animation:pSheen 2.5s ease-in-out infinite;left:-5%;"></div></div>
-        ${cta} →
-      </div>
-    </div>
-  </div>`;
-
-  /* ══════════════════════════════════════════════════
-     TEMPLATE 1 — "Bold Hero" (image-top, content-bottom)
-  ══════════════════════════════════════════════════ */
-  if (tpl === 1) return kf + `
-  <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;background:#040a18;overflow:hidden;color:#fff;display:flex;flex-direction:column;">
-    <!-- top image zone -->
-    <div style="position:relative;height:42%;flex-shrink:0;overflow:hidden;">
-      ${bg}
-      <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(4,10,24,0.2) 0%,rgba(4,10,24,0.98) 100%);z-index:1;"></div>
-      <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,${accent},#00d4ff,${accent});z-index:3;"></div>
-      <!-- floating tag -->
-      <div style="position:absolute;top:16px;right:16px;background:${aa(0.85)};border:1px solid ${aa(0.5)};border-radius:99px;padding:6px 14px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;z-index:3;">✦ PostAI</div>
-      <!-- headline on image -->
-      <div style="position:absolute;bottom:20px;left:22px;right:22px;z-index:2;">
-        <div style="font-size:38px;font-weight:900;line-height:1.0;letter-spacing:-2px;text-transform:uppercase;color:#fff;text-shadow:0 2px 20px rgba(0,0,0,0.8);">${headline}</div>
-        <div style="font-size:14px;font-weight:600;color:${accent};margin-top:6px;">${subheadline}</div>
-      </div>
-    </div>
-    <!-- bottom content zone -->
-    <div style="flex:1;padding:18px 22px;display:flex;flex-direction:column;gap:12px;background:linear-gradient(180deg,#040a18,#080520);">
-      <div style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.7;">${description}</div>
-      <!-- horizontal progress bars as features -->
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        ${pts.map((p,i)=>`<div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <div style="display:flex;align-items:center;gap:7px;"><span style="font-size:13px;">${icons[i]}</span><span style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.85);">${clean(p)}</span></div>
-            <span style="font-size:10px;color:${accent};font-weight:700;">${['95%','88%','92%','97%'][i]}</span>
-          </div>
-          <div style="height:3px;background:rgba(255,255,255,0.08);border-radius:99px;overflow:hidden;">
-            <div style="height:100%;width:${['95%','88%','92%','97%'][i]};background:linear-gradient(90deg,${accent},#00d4ff);border-radius:99px;animation:pBar 1.${i}s ease both;"></div>
-          </div>
-        </div>`).join('')}
-      </div>
-      <!-- stat + cta row -->
-      <div style="margin-top:auto;display:flex;gap:10px;align-items:stretch;">
-        <div style="background:${aa(0.15)};border:1px solid ${aa(0.3)};border-radius:14px;padding:12px 16px;text-align:center;flex-shrink:0;min-width:90px;">
-          <div style="font-size:28px;font-weight:900;color:${accent};line-height:1;">${stat}</div>
-          <div style="font-size:8px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-top:3px;">${stat_label}</div>
-        </div>
-        <div style="flex:1;background:linear-gradient(135deg,${accent},#00d4ff);border-radius:14px;padding:14px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;letter-spacing:0.8px;text-transform:uppercase;position:relative;overflow:hidden;">
-          <div style="position:absolute;inset:0;overflow:hidden;"><div style="position:absolute;top:-50%;width:30%;height:200%;background:rgba(255,255,255,0.2);transform:rotate(25deg);animation:pSheen 2.5s ease-in-out infinite;left:-5%;"></div></div>
-          ${cta} →
-        </div>
-      </div>
-    </div>
-  </div>`;
-
-  /* ══════════════════════════════════════════════════
-     TEMPLATE 2 — "Cinematic Full" (full-bleed image + overlay)
-  ══════════════════════════════════════════════════ */
-  if (tpl === 2) return kf + `
-  <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;">
-    ${bg}
-    <div style="position:absolute;inset:0;background:linear-gradient(175deg,rgba(3,7,20,0.75) 0%,rgba(5,2,25,0.6) 40%,rgba(3,7,20,0.95) 100%);z-index:1;"></div>
-    <!-- animated ring decoration -->
-    <div style="position:absolute;top:50%;right:-60px;transform:translateY(-50%);width:260px;height:260px;border-radius:50%;border:1.5px solid ${aa(0.25)};z-index:2;animation:pSpin 20s linear infinite;"></div>
-    <div style="position:absolute;top:50%;right:-40px;transform:translateY(-50%);width:200px;height:200px;border-radius:50%;border:1.5px solid ${aa(0.15)};z-index:2;animation:pSpin 14s linear infinite reverse;"></div>
-    <div style="position:absolute;top:50%;right:-20px;transform:translateY(-50%);width:140px;height:140px;border-radius:50%;border:1.5px dashed ${aa(0.3)};z-index:2;animation:pSpin 8s linear infinite;"></div>
-    <!-- top bar -->
-    <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,${accent},#00d4ff,${accent});z-index:5;"></div>
-    <div style="position:relative;z-index:3;padding:30px 26px;display:flex;flex-direction:column;height:100%;box-sizing:border-box;">
-      <!-- header -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;">
-        <div style="display:flex;align-items:center;gap:8px;"><div style="width:32px;height:32px;border-radius:9px;background:${accent};display:flex;align-items:center;justify-content:center;font-size:16px;animation:pPulse 3s ease infinite;">✦</div><span style="font-size:14px;font-weight:800;">PostAI</span></div>
-        <div style="font-size:9px;letter-spacing:2.5px;color:rgba(255,255,255,0.4);text-transform:uppercase;">INNOVATE · AUTOMATE · ELEVATE</div>
-      </div>
-      <!-- large headline -->
-      <div style="font-size:42px;font-weight:900;line-height:1.0;letter-spacing:-2px;text-transform:uppercase;color:#fff;margin-bottom:10px;">${headline}</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-        <div style="height:3px;width:40px;background:linear-gradient(90deg,${accent},#00d4ff);border-radius:99px;"></div>
-        <div style="font-size:14px;font-weight:600;color:${accent};">${subheadline}</div>
-      </div>
-      <div style="font-size:11.5px;color:rgba(255,255,255,0.6);line-height:1.8;max-width:70%;margin-bottom:22px;">${description}</div>
-      <!-- horizontal feature pills -->
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:auto;">
-        ${pts.map((p,i)=>`<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:99px;padding:7px 14px;display:flex;align-items:center;gap:7px;">
-          <span style="font-size:13px;">${icons[i]}</span><span style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.9);">${clean(p)}</span>
-        </div>`).join('')}
-      </div>
-      <!-- bottom stat + cta -->
-      <div style="margin-top:20px;">
-        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:16px 20px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
-          <div><div style="font-size:9px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Key Metric</div><div style="font-size:38px;font-weight:900;color:${accent};letter-spacing:-2px;line-height:1;">${stat}</div><div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px;">${stat_label}</div></div>
-          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
-            ${['✓ Proven','✓ Trusted','✓ Certified'].map(l=>`<div style="font-size:10px;color:rgba(255,255,255,0.6);font-weight:600;">${l}</div>`).join('')}
-          </div>
-        </div>
-        <div style="background:linear-gradient(135deg,${accent},#00d4ff);border-radius:14px;padding:16px;text-align:center;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;position:relative;overflow:hidden;">
-          <div style="position:absolute;inset:0;overflow:hidden;"><div style="position:absolute;top:-50%;width:30%;height:200%;background:rgba(255,255,255,0.18);transform:rotate(25deg);animation:pSheen 3s ease-in-out infinite;left:-5%;"></div></div>
-          ${cta} →
-        </div>
-      </div>
-    </div>
-  </div>`;
-
-  /* ══════════════════════════════════════════════════
-     TEMPLATE 3 — "Dark Magazine" (cards grid style)
-  ══════════════════════════════════════════════════ */
   return kf + `
-  <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;background:#050c1e;overflow:hidden;color:#fff;">
-    ${bg}
-    <div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(5,12,30,0.94) 0%,rgba(12,4,38,0.88) 55%,rgba(5,12,30,0.96) 100%);z-index:1;"></div>
-    <!-- hex grid bg -->
-    <div style="position:absolute;inset:0;z-index:1;background-image:radial-gradient(circle,${aa(0.15)} 1px,transparent 1px);background-size:30px 30px;animation:pGrid 6s ease infinite;"></div>
-    <!-- glow -->
-    <div style="position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:400px;height:200px;background:radial-gradient(ellipse,${aa(0.35)},transparent 70%);z-index:2;animation:pOrb 6s ease-in-out infinite;"></div>
-    <!-- top bar -->
-    <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,${accent},#00d4ff,${accent});z-index:5;"></div>
-    <div style="position:relative;z-index:3;padding:26px 24px;display:flex;flex-direction:column;height:100%;box-sizing:border-box;">
-      <!-- header with centered logo -->
-      <div style="text-align:center;margin-bottom:20px;">
-        <div style="display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:99px;padding:7px 16px;">
-          <div style="width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,${accent},#00d4ff);display:flex;align-items:center;justify-content:center;font-size:13px;">✦</div>
-          <span style="font-size:12px;font-weight:700;">PostAI</span>
-          <span style="font-size:8px;color:rgba(255,255,255,0.35);letter-spacing:2px;text-transform:uppercase;">Generated</span>
-        </div>
-      </div>
-      <!-- centered headline -->
-      <div style="text-align:center;margin-bottom:8px;">
-        <div style="font-size:36px;font-weight:900;line-height:1.05;letter-spacing:-2px;text-transform:uppercase;color:#fff;">${headline}</div>
-        <div style="font-size:13px;font-weight:600;color:${accent};margin-top:8px;">${subheadline}</div>
-      </div>
-      <!-- centered divider -->
-      <div style="display:flex;align-items:center;gap:12px;margin:12px 0;">
-        <div style="flex:1;height:1px;background:linear-gradient(to right,transparent,${aa(0.5)});"></div>
-        <div style="width:6px;height:6px;border-radius:50%;background:${accent};"></div>
-        <div style="flex:1;height:1px;background:linear-gradient(to left,transparent,${aa(0.5)});"></div>
-      </div>
-      <!-- description -->
-      <div style="text-align:center;font-size:11px;color:rgba(255,255,255,0.55);line-height:1.7;margin-bottom:16px;">${description}</div>
-      <!-- 2x2 feature cards (larger) -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px;">
-        ${pts.map((p,i)=>`<div style="background:rgba(255,255,255,0.04);border:1px solid ${aa(0.22)};border-radius:14px;padding:13px;text-align:center;position:relative;overflow:hidden;">
-          <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,${accent},#00d4ff);"></div>
-          <div style="font-size:20px;margin-bottom:6px;">${icons[i]}</div>
-          <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.9);line-height:1.3;">${clean(p)}</div>
-        </div>`).join('')}
-      </div>
-      <!-- stat centered -->
-      <div style="margin-top:auto;background:linear-gradient(135deg,${aa(0.25)},rgba(0,212,255,0.15));border:1px solid ${aa(0.4)};border-radius:18px;padding:16px;text-align:center;margin-bottom:12px;position:relative;overflow:hidden;">
-        <div style="position:absolute;inset:0;overflow:hidden;"><div style="position:absolute;top:-50%;width:60%;height:200%;background:rgba(255,255,255,0.04);transform:rotate(25deg);animation:pSheen 4s ease-in-out infinite;left:-10%;"></div></div>
-        <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">Key Achievement</div>
-        <div style="font-size:44px;font-weight:900;color:${accent};letter-spacing:-3px;line-height:1;">${stat}</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:5px;">${stat_label}</div>
-      </div>
-      <!-- CTA -->
-      <div style="background:linear-gradient(135deg,${accent},#00d4ff);border-radius:14px;padding:16px;text-align:center;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;position:relative;overflow:hidden;">
-        <div style="position:absolute;inset:0;overflow:hidden;"><div style="position:absolute;top:-50%;width:30%;height:200%;background:rgba(255,255,255,0.2);transform:rotate(25deg);animation:pSheen 2.5s ease-in-out infinite;left:-5%;"></div></div>
-        ${cta} →
-      </div>
-    </div>
+  <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#030b1a;">
+    ${bgImg}
+    <div style="position:absolute;inset:0;background:${overlayGrad};z-index:1;"></div>
+    ${decor}
+    ${logo}
+    ${cornerStat}
+    <div style="${panelStyle}">${panelInner}</div>
   </div>`;
 }
 
@@ -1464,14 +1367,31 @@ async function regenerateImage() {
   generatedImageUrl = null;
   try {
     toast('🎨 Regenerating poster...');
-    const [content, bgUrl] = await Promise.all([
-      genPosterContent(apiKey, model, topic),
-      genBgImage(topic)
-    ]);
-    frame.innerHTML = renderPosterHTML(content, bgUrl);
+    const design = await genPosterDesign(apiKey, model, topic);
+    const bgUrl  = await genBgImage(topic, design.accent, design.image_prompt);
+    frame.innerHTML = renderPosterHTML(design, bgUrl);
     generatedImageUrl = bgUrl || 'poster-ready';
     toast('🎨 New poster generated!');
   } catch(e) { toast('❌ ' + (e.message || e)); }
+}
+
+async function openPosterInTab() {
+  const el = document.querySelector('.poster-design');
+  if (!el) { toast('⚠️ Generate a poster first'); return; }
+  toast('⏳ Opening poster...');
+  try {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    document.head.appendChild(script);
+    await new Promise((res, rej) => { script.onload = res; script.onerror = rej; });
+    const canvas = await html2canvas(el, { useCORS: true, allowTaint: true, scale: 2, backgroundColor: null });
+    const dataUrl = canvas.toDataURL('image/png');
+    const win = window.open();
+    win.document.write(`<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${dataUrl}" style="max-height:100vh;max-width:100%;object-fit:contain;"></body></html>`);
+    win.document.close();
+  } catch(e) {
+    toast('❌ Could not open poster: ' + e.message);
+  }
 }
 
 async function downloadImage() {

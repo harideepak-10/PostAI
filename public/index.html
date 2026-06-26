@@ -3,1671 +3,414 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PostAI — AI Social Media Creator</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <title>PostAI</title>
   <style>
-    /* ── CSS Variables ─────────────────────────────────────── */
-    :root {
-      --background:         201 100% 13%;
-      --foreground:         0 0% 100%;
-      --muted:              0 0% 10%;
-      --muted-foreground:   240 4% 66%;
-      --primary:            0 0% 100%;
-      --primary-foreground: 0 0% 4%;
-      --secondary:          0 0% 10%;
-      --border:             0 0% 18%;
-      --accent:             265 89% 73%;
-
-      --font-display: 'Instrument Serif', serif;
-      --font-body:    'Inter', sans-serif;
-
-      --bg:      hsl(var(--background));
-      --fg:      hsl(var(--foreground));
-      --muted-fg:hsl(var(--muted-foreground));
-      --surface: rgba(255,255,255,0.04);
-      --surface2:rgba(255,255,255,0.07);
-      --bdr:     rgba(255,255,255,0.09);
-      --bdr2:    rgba(255,255,255,0.15);
-      --violet:  #7c5cfc;
-      --pink:    #f472b6;
-      --cyan:    #22d3ee;
-      --green:   #4ade80;
-      --red:     #f87171;
-      --li:      #0a66c2;
-      --ig-grad: linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);
-      --fb:      #1877f2;
-    }
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
+
+    :root {
+      --bg:        #080810;
+      --surface:   #10101c;
+      --card:      #14142a;
+      --border:    #1e1e3a;
+      --primary:   #6366f1;
+      --primary-h: #818cf8;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --radius:    14px;
+    }
 
     body {
-      font-family: var(--font-body);
       background: var(--bg);
-      color: var(--fg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       min-height: 100vh;
-      overflow-x: hidden;
-      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Liquid Glass ──────────────────────────────────────── */
-    .liquid-glass {
-      background: rgba(255,255,255,0.01);
-      background-blend-mode: luminosity;
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      border: none;
-      box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
-      position: relative;
-      overflow: hidden;
+    nav {
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      height: 60px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(8,8,16,.9);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
-    .liquid-glass::before {
-      content: '';
+
+    .logo {
+      font-size: 1.2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #818cf8, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      align-items: start;
+    }
+
+    @media (max-width: 680px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+
+    .panel-title {
+      font-size: .75rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: .95rem;
+      padding: 14px 16px;
+      resize: none;
+      outline: none;
+      line-height: 1.6;
+      transition: border-color .2s;
+    }
+
+    textarea:focus { border-color: var(--primary); }
+    textarea::placeholder { color: var(--muted); }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 13px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      margin-top: 12px;
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn:hover { background: var(--primary-h); transform: translateY(-1px); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    .status {
+      display: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: .85rem;
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+
+    .status.info  { display: block; background: rgba(99,102,241,.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,.3); }
+    .status.error { display: block; background: rgba(239,68,68,.12); color: #fca5a5; border: 1px solid rgba(239,68,68,.25); }
+    .status.ok    { display: block; background: rgba(34,197,94,.12); color: #86efac; border: 1px solid rgba(34,197,94,.25); }
+
+    /* Captions */
+    .captions-section { display: none; margin-top: 16px; }
+
+    .caption-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+
+    .caption-tab {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: .8rem;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .caption-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .caption-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 6px;
+    }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: .78rem;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .copy-btn:hover { color: var(--text); border-color: var(--muted); }
+
+    .caption-content {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: .85rem;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    /* Image preview */
+    .image-box {
+      background: var(--card);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      aspect-ratio: 4/5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      color: var(--muted);
+      font-size: .9rem;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .image-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: transform .3s;
+    }
+
+    .image-box img:hover { transform: scale(1.02); }
+    .placeholder-icon { font-size: 2.5rem; opacity: .25; }
+
+    .image-loading {
       position: absolute;
       inset: 0;
-      border-radius: inherit;
-      padding: 1.4px;
-      background: linear-gradient(180deg,
-        rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%,
-        rgba(255,255,255,0)    40%, rgba(255,255,255,0)    60%,
-        rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%);
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      pointer-events: none;
-    }
-
-    /* ── Animations ────────────────────────────────────────── */
-    @keyframes fade-rise {
-      from { opacity: 0; transform: translateY(24px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes spinR { to { transform: rotate(360deg); } }
-    @keyframes corePulse {
-      0%,100% { transform: scale(1);    box-shadow: 0 0 40px rgba(124,92,252,0.7); }
-      50%      { transform: scale(1.12); box-shadow: 0 0 70px rgba(124,92,252,1);   }
-    }
-    @keyframes barFill {
-      0%  { width: 0%;   } 30% { width: 42%; }
-      65% { width: 74%;  } 85% { width: 89%; }
-      100%{ width: 100%; }
-    }
-    @keyframes barGrad  { 0%{background-position:300% 0} 100%{background-position:-300% 0} }
-    @keyframes blink    { 0%,100%{opacity:1} 50%{opacity:0.25} }
-    @keyframes skPulse  { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
-    @keyframes gradMove { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-    @keyframes sheen    { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
-
-    .animate-fade-rise         { animation: fade-rise 0.8s ease-out         both; }
-    .animate-fade-rise-d1      { animation: fade-rise 0.8s ease-out 0.2s    both; }
-    .animate-fade-rise-d2      { animation: fade-rise 0.8s ease-out 0.4s    both; }
-    .animate-fade-rise-d3      { animation: fade-rise 0.8s ease-out 0.6s    both; }
-
-    /* ── SPLASH ────────────────────────────────────────────── */
-    #splash {
-      position: fixed; inset: 0; z-index: 1000;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: var(--bg); gap: 40px;
-      transition: opacity 0.9s ease, transform 0.9s ease;
-    }
-    #splash.hide { opacity: 0; transform: scale(1.05); pointer-events: none; }
-
-    .splash-logo {
-      position: relative; width: 110px; height: 110px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .ring {
-      position: absolute; inset: 0; border-radius: 50%;
-      border: 2px solid transparent;
-    }
-    .ring1 { border-top-color: var(--violet); border-right-color: var(--violet); animation: spinR 1.4s linear infinite; }
-    .ring2 { inset: 10px; border-bottom-color: var(--pink); border-left-color: var(--pink); animation: spinR 1s linear infinite reverse; }
-    .ring3 { inset: 22px; border-top-color: var(--cyan); animation: spinR 0.7s linear infinite; }
-    .core {
-      width: 42px; height: 42px; border-radius: 50%;
-      background: linear-gradient(135deg, var(--violet), var(--pink));
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px; z-index: 1;
-      animation: corePulse 1.4s ease-in-out infinite;
-      box-shadow: 0 0 40px rgba(124,92,252,0.7);
-    }
-
-    .splash-title {
-      font-family: var(--font-display);
-      font-size: 52px; font-weight: 400; letter-spacing: -1.5px;
-      background: linear-gradient(135deg, var(--violet) 0%, var(--pink) 50%, var(--cyan) 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-      text-align: center;
-    }
-    .splash-sub { font-size: 15px; color: var(--muted-fg); text-align: center; letter-spacing: 0.3px; }
-    .splash-progress {
-      width: 280px; height: 3px;
-      background: rgba(255,255,255,0.07); border-radius: 99px; overflow: hidden;
-    }
-    .splash-bar {
-      height: 100%; width: 0%; border-radius: 99px;
-      background: linear-gradient(90deg, var(--violet), var(--pink), var(--cyan));
-      background-size: 300% 100%;
-      animation: barFill 2.6s ease forwards, barGrad 1.5s linear infinite;
-    }
-    .splash-status { font-size: 12px; color: var(--muted-fg); letter-spacing: 1.2px; text-transform: uppercase; }
-
-    /* ── APP ───────────────────────────────────────────────── */
-    #app {
-      opacity: 0; transform: translateY(24px);
-      transition: opacity 0.9s ease, transform 0.9s ease;
-      min-height: 100vh;
-    }
-    #app.show { opacity: 1; transform: translateY(0); }
-
-    /* ── HERO SECTION (video bg) ───────────────────────────── */
-    .hero-section {
-      position: relative;
-      min-height: 100vh;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
-    }
-    .hero-video {
-      position: absolute;
-      inset: 0; width: 100%; height: 100%;
-      object-fit: cover; z-index: 0;
-    }
-    .hero-scrim {
-      position: absolute; inset: 0; z-index: 1;
-      background: rgba(2, 37, 52, 0.5);
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: rgba(10,10,20,.85);
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: .85rem;
     }
 
-
-    /* ── FLOATING SETTINGS ─────────────────────────────────── */
-    .btn-float-settings {
-      position: absolute; top: 24px; right: 28px; z-index: 10;
-      width: 42px; height: 42px; border-radius: 12px;
-      font-size: 18px; color: var(--fg);
-      cursor: pointer; transition: transform 0.2s;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .btn-float-settings:hover { transform: scale(1.08) rotate(20deg); }
-
-    /* ── HERO CONTENT ──────────────────────────────────────── */
-    .hero-content {
-      position: relative; z-index: 2;
-      flex: 1;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 48px 24px;
+    .pulse-ring {
+      width: 52px; height: 52px;
+      border: 3px solid var(--primary);
+      border-radius: 50%;
+      animation: pulse 1.4s ease-in-out infinite;
     }
 
-    /* ── CREATOR WRAP ──────────────────────────────────────── */
-    .creator-wrap {
-      width: 100%; max-width: 860px;
-      display: flex; flex-direction: column; gap: 20px;
-    }
-    .creator-head {
-      text-align: center; margin-bottom: 8px;
-    }
-    .creator-logo {
-      font-family: var(--font-display);
-      font-size: 36px; font-weight: 400; letter-spacing: -1px;
-      background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    }
-    .creator-logo sup { font-size: 14px; }
-    .creator-sub {
-      font-size: 14px; color: var(--muted-fg);
-      margin-top: 6px; line-height: 1.6;
+    @keyframes pulse {
+      0%   { transform: scale(.8); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
     }
 
-    /* ── GLASS CARD ────────────────────────────────────────── */
-    .glass-card {
-      background: var(--surface);
-      border: 1px solid var(--bdr);
-      border-radius: 22px;
-      backdrop-filter: blur(20px);
-      transition: border-color 0.3s;
-    }
-    .glass-card:hover { border-color: var(--bdr2); }
-
-    /* ── FIELD LABEL ───────────────────────────────────────── */
-    .field-label {
-      font-size: 11px; font-weight: 600; color: var(--muted-fg);
-      text-transform: uppercase; letter-spacing: 1.2px;
-      margin-bottom: 12px;
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
     }
 
-    /* ── TOPIC ─────────────────────────────────────────────── */
-    .topic-wrap { padding: 28px 30px; }
-    .topic-box  { position: relative; }
-    .topic-ta {
-      width: 100%; background: rgba(255,255,255,0.06);
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.12); border-radius: 16px;
-      color: var(--fg); font-size: 15px; font-family: var(--font-body);
-      padding: 18px 20px 40px; resize: none; height: 130px; outline: none;
-      transition: border-color 0.25s, box-shadow 0.25s, background 0.25s; line-height: 1.65;
-      overflow-y: auto;
-    }
-    .topic-ta::placeholder { color: rgba(255,255,255,0.22); }
-    .topic-ta:focus {
-      background: rgba(255,255,255,0.09);
-      border-color: rgba(124,92,252,0.6);
-      box-shadow: 0 0 0 4px rgba(124,92,252,0.1), inset 0 1px 1px rgba(255,255,255,0.08);
-    }
-    .topic-ta::-webkit-scrollbar { width: 5px; }
-    .topic-ta::-webkit-scrollbar-track { background: transparent; }
-    .topic-ta::-webkit-scrollbar-thumb { background: rgba(124,92,252,0.4); border-radius: 99px; }
-    .topic-ta::-webkit-scrollbar-thumb:hover { background: rgba(124,92,252,0.7); }
-    .topic-count { position: absolute; bottom: 14px; right: 16px; font-size: 12px; color: var(--muted-fg); pointer-events: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── DIVIDER ───────────────────────────────────────────── */
-    .div-line { height: 1px; background: var(--bdr); margin: 0 30px; }
-
-    /* ── PLATFORM GRID ─────────────────────────────────────── */
-    .plat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; padding: 24px 30px; }
-    @media(max-width:640px){ .plat-grid { grid-template-columns: 1fr; } }
-
-    .plat-card {
-      border: 1.5px solid var(--bdr); border-radius: 18px; padding: 18px 16px;
-      cursor: pointer; transition: all 0.25s;
-      display: flex; align-items: center; gap: 14px;
-      background: var(--surface); user-select: none; position: relative; overflow: hidden;
-    }
-    .plat-card::after {
-      content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity 0.3s; pointer-events: none;
-    }
-    .plat-card.li::after  { background: radial-gradient(circle at 20% 50%, rgba(10,102,194,0.14), transparent 70%); }
-    .plat-card.ig::after  { background: radial-gradient(circle at 20% 50%, rgba(225,48,108,0.14), transparent 70%); }
-    .plat-card.fb::after  { background: radial-gradient(circle at 20% 50%, rgba(24,119,242,0.14), transparent 70%); }
-    .plat-card.active::after { opacity: 1; }
-    .plat-card.active.li { border-color: rgba(10,102,194,0.6); box-shadow: 0 0 24px rgba(10,102,194,0.12); }
-    .plat-card.active.ig { border-color: rgba(225,48,108,0.6); box-shadow: 0 0 24px rgba(225,48,108,0.12); }
-    .plat-card.active.fb { border-color: rgba(24,119,242,0.6); box-shadow: 0 0 24px rgba(24,119,242,0.12); }
-
-    .plat-icon {
-      width: 46px; height: 46px; border-radius: 13px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; font-weight: 800;
-      flex-shrink: 0; color: white; position: relative; z-index: 1;
-    }
-    .plat-icon.li { background: var(--li); }
-    .plat-icon.ig { background: var(--ig-grad); }
-    .plat-icon.fb { background: var(--fb); }
-
-    .plat-info { flex: 1; z-index: 1; }
-    .plat-info strong { display: block; font-size: 14px; font-weight: 600; }
-    .plat-info span   { font-size: 12px; color: var(--muted-fg); }
-    .plat-chk {
-      width: 22px; height: 22px; border-radius: 7px;
-      border: 1.5px solid var(--bdr2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 12px; transition: all 0.2s; flex-shrink: 0; z-index: 1;
-    }
-    .plat-card.active .plat-chk { background: var(--violet); border-color: var(--violet); box-shadow: 0 0 12px rgba(124,92,252,0.5); }
-
-    /* ── GENERATE BUTTON ───────────────────────────────────── */
-    .gen-wrap { padding: 0 30px 30px; margin-top: 16px; }
-    .btn-gen {
-      width: 100%; padding: 20px; border: none; border-radius: 18px;
-      font-size: 16px; font-weight: 600; font-family: var(--font-body);
-      cursor: pointer; position: relative; overflow: hidden;
-      color: white; letter-spacing: 0.3px;
-      background: linear-gradient(135deg, var(--violet) 0%, #c084fc 50%, var(--pink) 100%);
-      background-size: 250% 250%;
-      animation: gradMove 4s ease infinite;
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      transition: transform 0.25s, box-shadow 0.25s;
-    }
-    .btn-gen::before {
-      content: ''; position: absolute; inset: 0;
-      background: linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.18) 50%,transparent 100%);
-      transform: translateX(-100%); animation: sheen 2.8s ease infinite;
-    }
-    .btn-gen:hover { transform: translateY(-3px); box-shadow: 0 20px 50px rgba(124,92,252,0.4); }
-    .btn-gen:active { transform: translateY(0); }
-    .btn-gen:disabled {
-      opacity: 0.55; cursor: not-allowed; transform: none !important;
-      box-shadow: none !important; animation: none;
-      background: linear-gradient(135deg,rgba(124,92,252,0.4),rgba(192,132,252,0.4));
+    .open-link {
+      display: block;
+      text-align: center;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: .82rem;
+      text-decoration: none;
     }
 
-    /* ── RESULTS ───────────────────────────────────────────── */
-    #results { display: none; flex-direction: column; gap: 24px; }
-    #results.show { display: flex; animation: fade-rise 0.6s ease both; }
-
-    .results-label {
-      font-family: var(--font-display);
-      font-size: 22px; font-weight: 400; letter-spacing: -0.5px;
-      color: rgba(255,255,255,0.8);
-    }
-    .results-label em { font-style: normal; color: var(--muted-fg); }
-
-    .results-grid { display: grid; grid-template-columns: 300px 1fr; gap: 22px; }
-    @media(max-width:860px){ .results-grid { grid-template-columns: 1fr; } }
-
-    /* ── POSTER ────────────────────────────────────────────── */
-    .poster-panel { display: flex; flex-direction: column; gap: 12px; }
-    .poster-frame {
-      aspect-ratio: 4/5; border-radius: 20px; overflow: hidden;
-      position: relative; border: 1px solid var(--bdr);
-      background: var(--surface); cursor: pointer; transition: box-shadow 0.3s;
-    }
-    .poster-frame:hover { box-shadow: 0 0 0 2px var(--violet); }
-    .poster-frame img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s ease; }
-    .poster-frame:hover img { transform: scale(1.04); }
-    .poster-overlay {
-      position: absolute; inset: 0;
-      background: linear-gradient(to top, rgba(0,0,0,0.75), transparent 55%);
-      opacity: 0; transition: opacity 0.3s;
-      display: flex; align-items: flex-end; justify-content: center; padding-bottom: 22px;
-    }
-    .poster-frame:hover .poster-overlay { opacity: 1; }
-    .poster-overlay span {
-      font-size: 13px; font-weight: 600; color: white;
-      background: rgba(255,255,255,0.15); padding: 9px 22px;
-      border-radius: 99px; backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-    .skeleton {
-      width: 100%; height: 100%;
-      background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 50%, var(--surface) 100%);
-      background-size: 300% 300%;
-      animation: skPulse 2s ease infinite;
-    }
-    .poster-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .btn-act {
-      padding: 11px; background: var(--surface); border: 1px solid var(--bdr);
-      border-radius: 12px; color: var(--muted-fg); font-size: 13px;
-      font-family: var(--font-body); cursor: pointer; transition: all 0.2s;
-      display: flex; align-items: center; justify-content: center; gap: 7px;
-    }
-    .btn-act:hover { border-color: var(--violet); color: var(--violet); background: rgba(124,92,252,0.06); }
-
-    /* ── POST ALL BUTTON ───────────────────────────────────── */
-    .btn-post-all {
-      width: 100%; padding: 18px; border: none; border-radius: 18px;
-      font-size: 15px; font-weight: 600; font-family: var(--font-body);
-      cursor: pointer; color: white; letter-spacing: 0.3px;
-      background: linear-gradient(135deg, #0a66c2 0%, #cc2366 50%, #1877f2 100%);
-      background-size: 250% 250%;
-      animation: gradMove 5s ease infinite;
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      transition: transform 0.25s, box-shadow 0.25s;
-      position: relative; overflow: hidden;
-    }
-    .btn-post-all::before {
-      content: ''; position: absolute; inset: 0;
-      background: linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.15) 50%,transparent 100%);
-      transform: translateX(-100%); animation: sheen 3s ease infinite;
-    }
-    .btn-post-all:hover { transform: translateY(-3px); box-shadow: 0 20px 50px rgba(10,102,194,0.4); }
-    .btn-post-all:active { transform: translateY(0); }
-    .btn-post-all:disabled { opacity: 0.55; cursor: not-allowed; transform: none !important; box-shadow: none !important; animation: none; }
-
-    .plat-post-result {
-      display: flex; align-items: center; gap: 8px; padding: 10px 16px;
-      border-radius: 12px; font-size: 13px; font-weight: 500;
-      border: 1px solid var(--bdr);
-    }
-    .plat-post-result.ing { background: rgba(124,92,252,0.08); color: var(--violet); border-color: rgba(124,92,252,0.25); }
-    .plat-post-result.ok  { background: rgba(74,222,128,0.08); color: var(--green); border-color: rgba(74,222,128,0.25); }
-    .plat-post-result.err { background: rgba(248,113,113,0.08); color: var(--red); border-color: rgba(248,113,113,0.25); }
-
-    /* ── CAPTION CARDS ─────────────────────────────────────── */
-    .captions-col { display: flex; flex-direction: column; gap: 14px; }
-    .cap-card {
-      background: var(--surface); border: 1px solid var(--bdr);
-      border-radius: 20px; overflow: hidden; transition: border-color 0.25s;
-      animation: fade-rise 0.5s ease both;
-    }
-    .cap-card:hover { border-color: var(--bdr2); }
-    .cap-head {
-      display: flex; align-items: center; gap: 10px; padding: 17px 22px;
-      border-bottom: 1px solid var(--bdr); cursor: pointer;
-    }
-    .cap-ico {
-      width: 34px; height: 34px; border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 800; color: white; flex-shrink: 0;
-    }
-    .cap-ico.li { background: var(--li); }
-    .cap-ico.ig { background: var(--ig-grad); }
-    .cap-ico.fb { background: var(--fb); }
-    .cap-name { font-size: 14px; font-weight: 600; flex: 1; }
-    .cap-len  { font-size: 12px; color: var(--muted-fg); }
-    .cap-chev { font-size: 11px; color: var(--muted-fg); transition: transform 0.3s; }
-    .cap-card.collapsed .cap-chev { transform: rotate(-90deg); }
-    .cap-body { padding: 18px 22px; }
-    .cap-card.collapsed .cap-body { display: none; }
-    .cap-ta {
-      width: 100%; background: rgba(255,255,255,0.06);
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
-      color: var(--fg); font-size: 13px; font-family: var(--font-body);
-      padding: 14px 16px; resize: none; min-height: 126px; max-height: 280px; outline: none;
-      line-height: 1.75; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-      overflow-y: auto;
-    }
-    .cap-ta:focus {
-      background: rgba(255,255,255,0.09);
-      border-color: rgba(124,92,252,0.5);
-      box-shadow: 0 0 0 3px rgba(124,92,252,0.08), inset 0 1px 1px rgba(255,255,255,0.07);
-    }
-    .cap-ta::-webkit-scrollbar { width: 4px; }
-    .cap-ta::-webkit-scrollbar-track { background: transparent; }
-    .cap-ta::-webkit-scrollbar-thumb { background: rgba(124,92,252,0.4); border-radius: 99px; }
-    .cap-ta::-webkit-scrollbar-thumb:hover { background: rgba(124,92,252,0.65); }
-    .cap-foot { display: flex; align-items: center; gap: 9px; margin-top: 12px; }
-    .btn-cpy {
-      padding: 10px 14px; background: var(--surface2); border: 1px solid var(--bdr);
-      border-radius: 11px; color: var(--muted-fg); font-size: 13px;
-      font-family: var(--font-body); cursor: pointer; transition: all 0.2s;
-      display: flex; align-items: center; gap: 5px;
-    }
-    .btn-cpy:hover { color: var(--fg); border-color: var(--bdr2); }
-    .post-badge {
-      margin-left: auto; padding: 5px 14px; border-radius: 99px;
-      font-size: 11px; font-weight: 700; display: none;
-    }
-    .post-badge.show { display: inline-flex; align-items: center; gap: 5px; }
-    .post-badge.ok  { background: rgba(74,222,128,0.1); color: var(--green); border: 1px solid rgba(74,222,128,0.22); }
-    .post-badge.err { background: rgba(248,113,113,0.1); color: var(--red);   border: 1px solid rgba(248,113,113,0.22); }
-    .post-badge.ing { background: rgba(124,92,252,0.1); color: var(--violet); border: 1px solid rgba(124,92,252,0.22); }
-    .cap-sk { height: 140px; border-radius: 14px; }
-
-    /* ── SETTINGS MODAL ────────────────────────────────────── */
-    .modal-bg {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(16px);
-      z-index: 999;
-      display: flex; align-items: center; justify-content: flex-end;
-      opacity: 0; pointer-events: none; transition: opacity 0.35s;
-    }
-    .modal-bg.show { opacity: 1; pointer-events: all; }
-    .modal {
-      background: hsl(201 80% 9%);
-      border-left: 1px solid var(--bdr2);
-      width: 100%; max-width: 420px;
-      height: 100vh; overflow-y: auto;
-      padding: 0;
-      transform: translateX(40px);
-      transition: transform 0.38s cubic-bezier(0.22,1,0.36,1);
-      box-shadow: -24px 0 80px rgba(0,0,0,0.6);
-      display: flex; flex-direction: column;
-    }
-    .modal-bg.show .modal { transform: translateX(0); }
-
-    /* Modal header */
-    .modal-head {
-      padding: 28px 28px 20px;
-      border-bottom: 1px solid var(--bdr);
-      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-      position: sticky; top: 0;
-      background: hsl(201 80% 9%);
-      z-index: 1;
-    }
-    .modal-head-text h2 {
-      font-family: var(--font-display);
-      font-size: 22px; font-weight: 400; letter-spacing: -0.5px; margin-bottom: 4px;
-    }
-    .modal-head-text p { font-size: 12px; color: var(--muted-fg); line-height: 1.5; }
-    .btn-close {
-      width: 32px; height: 32px; border-radius: 8px;
-      background: var(--surface); border: 1px solid var(--bdr);
-      color: var(--muted-fg); font-size: 16px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.2s; flex-shrink: 0;
-    }
-    .btn-close:hover { background: var(--surface2); color: var(--fg); }
-
-    /* Modal sections */
-    .modal-body { padding: 24px 28px; flex: 1; display: flex; flex-direction: column; gap: 28px; }
-    .modal-section-title {
-      font-size: 10px; font-weight: 700; color: var(--violet);
-      text-transform: uppercase; letter-spacing: 1.5px;
-      margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
-    }
-    .modal-section-title::after {
-      content: ''; flex: 1; height: 1px; background: var(--bdr);
-    }
-
-    .mf { margin-bottom: 14px; }
-    .mf label {
-      display: block; font-size: 11px; font-weight: 600; color: var(--muted-fg);
-      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 7px;
-    }
-    .mf input, .mf select {
-      width: 100%; background: rgba(255,255,255,0.04); border: 1px solid var(--bdr);
-      border-radius: 10px; color: var(--fg); font-size: 13px;
-      font-family: var(--font-body); padding: 11px 14px; outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s; appearance: none;
-    }
-    .mf input:focus, .mf select:focus {
-      border-color: var(--violet);
-      box-shadow: 0 0 0 3px rgba(124,92,252,0.1);
-    }
-    .mf input::placeholder { color: rgba(255,255,255,0.15); }
-    .mf-hint { font-size: 11px; color: var(--muted-fg); margin-top: 5px; line-height: 1.5; }
-    .mf-hint a { color: #c084fc; text-decoration: none; }
-    .mf-hint a:hover { text-decoration: underline; }
-
-    /* Modal footer */
-    .modal-foot {
-      padding: 20px 28px 28px;
-      border-top: 1px solid var(--bdr);
-      display: flex; gap: 10px;
-      position: sticky; bottom: 0;
-      background: hsl(201 80% 9%);
-    }
-    .btn-msave {
-      flex: 1; padding: 13px;
-      background: linear-gradient(135deg, var(--violet), #c084fc);
-      border: none; border-radius: 12px; color: white; font-size: 14px; font-weight: 600;
-      font-family: var(--font-body); cursor: pointer; transition: all 0.2s;
-    }
-    .btn-msave:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,92,252,0.35); }
-    .btn-mcancel {
-      padding: 13px 20px; background: var(--surface); border: 1px solid var(--bdr);
-      border-radius: 12px; color: var(--muted-fg); font-size: 14px;
-      font-family: var(--font-body); cursor: pointer; transition: all 0.2s;
-    }
-    .btn-mcancel:hover { color: var(--fg); border-color: var(--bdr2); }
-
-    /* ── TOAST ─────────────────────────────────────────────── */
-    #toast {
-      position: fixed; bottom: 34px; left: 50%;
-      transform: translateX(-50%) translateY(18px);
-      opacity: 0; background: rgba(2,37,52,0.96);
-      border: 1px solid var(--bdr2); border-radius: 16px;
-      padding: 14px 26px; font-size: 14px; font-weight: 500; color: var(--fg);
-      z-index: 9999; pointer-events: none; backdrop-filter: blur(24px);
-      transition: all 0.38s cubic-bezier(0.34,1.56,0.64,1);
-      display: flex; align-items: center; gap: 10px;
-      white-space: nowrap; box-shadow: 0 16px 50px rgba(0,0,0,0.55);
-    }
-    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    /* ── SPINNER ───────────────────────────────────────────── */
-    .spin {
-      width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: white; border-radius: 50%; animation: spinR 0.75s linear infinite;
-    }
-
-    /* ══════════════════════════════════════════════════════════
-       RESPONSIVE — TABLET  (max 768px)
-    ══════════════════════════════════════════════════════════ */
-    @media (max-width: 768px) {
-      /* Splash */
-      .splash-title { font-size: 38px; }
-      .splash-progress { width: 220px; }
-
-      /* Hero / creator */
-      .hero-content { padding: 56px 16px 32px; justify-content: flex-start; }
-      .creator-wrap { gap: 16px; }
-      .creator-logo { font-size: 28px; }
-      .creator-sub  { font-size: 13px; }
-
-      /* Glass card internals */
-      .topic-wrap   { padding: 20px 18px; }
-      .topic-ta     { font-size: 14px; height: 110px; padding: 14px 16px; }
-      .div-line     { margin: 0 18px; }
-      .plat-grid    { grid-template-columns: 1fr; gap: 10px; padding: 18px 18px; }
-      .gen-wrap     { padding: 0 18px 22px; }
-      .btn-gen      { padding: 16px; font-size: 15px; }
-
-      /* Platform cards compact */
-      .plat-card    { padding: 14px 12px; }
-      .plat-icon    { width: 38px; height: 38px; font-size: 15px; }
-      .plat-info strong { font-size: 13px; }
-
-      /* Results */
-      .results-grid { grid-template-columns: 1fr; gap: 16px; }
-      .results-label { font-size: 18px; }
-
-      /* Caption cards */
-      .cap-head  { padding: 14px 16px; }
-      .cap-body  { padding: 14px 16px; }
-      .btn-cpy   { flex: 1; justify-content: center; }
-      .post-badge{ width: 100%; justify-content: center; margin-left: 0; }
-
-      /* Settings panel full width on mobile */
-      .modal     { max-width: 100%; border-left: none; border-top: 1px solid var(--bdr2); }
-      .modal-bg  { align-items: flex-end; }
-
-      /* Toast */
-      #toast { font-size: 13px; padding: 12px 18px; white-space: normal; max-width: 90vw; text-align: center; }
-
-      /* Floating settings */
-      .btn-float-settings { top: 16px; right: 16px; width: 38px; height: 38px; font-size: 16px; }
-    }
-
-    /* ══════════════════════════════════════════════════════════
-       RESPONSIVE — MOBILE  (max 480px)
-    ══════════════════════════════════════════════════════════ */
-    @media (max-width: 480px) {
-      /* Splash */
-      .splash-logo  { width: 80px; height: 80px; }
-      .ring2        { inset: 8px; }
-      .ring3        { inset: 18px; }
-      .core         { width: 32px; height: 32px; font-size: 16px; }
-      .splash-title { font-size: 32px; letter-spacing: -1px; }
-      .splash-sub   { font-size: 13px; }
-      .splash-progress { width: 180px; }
-
-      /* Creator */
-      .creator-logo { font-size: 24px; }
-      .creator-sub  { font-size: 12px; }
-      .hero-content { padding: 48px 12px 24px; }
-      .creator-wrap { gap: 12px; }
-
-      /* Cards */
-      .glass-card   { border-radius: 16px; }
-      .topic-wrap   { padding: 16px 14px; }
-      .topic-ta     { height: 100px; font-size: 14px; padding: 12px 14px; border-radius: 12px; }
-      .div-line     { margin: 0 14px; }
-      .plat-grid    { padding: 14px 14px; gap: 8px; }
-      .gen-wrap     { padding: 0 14px 18px; }
-      .btn-gen      { padding: 15px; font-size: 14px; border-radius: 14px; }
-
-      /* Platform compact */
-      .plat-card    { padding: 12px 10px; border-radius: 14px; }
-      .plat-icon    { width: 34px; height: 34px; font-size: 14px; border-radius: 10px; }
-      .plat-info strong { font-size: 12px; }
-      .plat-info span   { font-size: 11px; }
-      .plat-chk     { width: 18px; height: 18px; font-size: 10px; }
-
-      /* Results */
-      .results-label { font-size: 16px; }
-      .poster-btns   { grid-template-columns: 1fr 1fr; }
-      .btn-act       { padding: 9px; font-size: 12px; }
-
-      /* Caption cards */
-      .cap-ico  { width: 28px; height: 28px; font-size: 12px; border-radius: 8px; }
-      .cap-name { font-size: 13px; }
-      .cap-ta   { font-size: 12px; min-height: 100px; padding: 12px 14px; }
-      .btn-cpy  { font-size: 11px; padding: 8px 10px; }
-    }
-
+    .open-link:hover { color: var(--primary-h); }
   </style>
 </head>
 <body>
 
-<!-- ─── SPLASH ────────────────────────────────────────────── -->
-<div id="splash">
-  <div class="splash-logo">
-    <div class="ring ring1"></div>
-    <div class="ring ring2"></div>
-    <div class="ring ring3"></div>
-    <div class="core">✦</div>
-  </div>
-  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
-    <div class="splash-title">PostAI</div>
-    <div class="splash-sub">AI Social Media Creator</div>
-  </div>
-  <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
-    <div class="splash-progress"><div class="splash-bar"></div></div>
-    <div class="splash-status" id="splashStatus">Initializing engine...</div>
-  </div>
-</div>
+<nav>
+  <div class="logo">&#10022; PostAI</div>
+</nav>
 
-<!-- ─── APP ───────────────────────────────────────────────── -->
-<div id="app">
+<main>
 
-  <!-- ══ HERO + CREATE ════════════════════════════════════════ -->
-  <section class="hero-section">
+  <!-- Left: Input + Captions -->
+  <div>
+    <div class="panel">
+      <p class="panel-title">Describe your image</p>
+      <textarea id="prompt" rows="6"
+        placeholder="e.g. A futuristic electric car charging at night, neon city reflections on wet pavement, cinematic shot..."></textarea>
 
-    <!-- Video Background -->
-    <video class="hero-video" autoplay loop muted playsinline>
-      <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" type="video/mp4" />
-    </video>
-    <div class="hero-scrim"></div>
+      <button class="btn" id="gen-btn" onclick="generate()">
+        <span id="gen-btn-text">&#9654;&nbsp; Generate with FLUX</span>
+      </button>
 
-    <!-- Floating settings button -->
-    <button class="btn-float-settings liquid-glass" onclick="openSettings()">⚙</button>
-
-    <!-- Main creation UI centered on video -->
-    <div class="hero-content" id="create">
-      <div class="creator-wrap animate-fade-rise">
-
-        <!-- Card header -->
-        <div class="creator-head">
-          <span class="creator-logo">PostAI<sup>®</sup></span>
-          <p class="creator-sub">Turn any idea into a poster — ready to post everywhere.</p>
-        </div>
-
-      <!-- Input card -->
-      <div class="glass-card">
-        <div class="topic-wrap">
-          <div class="field-label">✍ What's your post about?</div>
-          <div class="topic-box">
-            <textarea class="topic-ta" id="topicInput"
-              placeholder="e.g. We just launched our AI productivity app — sharing the story and what makes it special..."></textarea>
-          </div>
-        </div>
-
-        <div class="div-line"></div>
-
-        <div style="padding:20px 30px 4px;">
-          <div class="field-label">📱 Target Platforms</div>
-        </div>
-        <div class="plat-grid">
-          <div class="plat-card li active" id="plt-linkedin" onclick="togglePlat(this,'linkedin')">
-            <div class="plat-icon li">in</div>
-            <div class="plat-info"><strong>LinkedIn</strong><span>Professional network</span></div>
-            <div class="plat-chk">✓</div>
-          </div>
-          <div class="plat-card ig active" id="plt-instagram" onclick="togglePlat(this,'instagram')">
-            <div class="plat-icon ig">📷</div>
-            <div class="plat-info"><strong>Instagram</strong><span>Photo &amp; Stories</span></div>
-            <div class="plat-chk">✓</div>
-          </div>
-          <div class="plat-card fb active" id="plt-facebook" onclick="togglePlat(this,'facebook')">
-            <div class="plat-icon fb" style="font-size:22px;">f</div>
-            <div class="plat-info"><strong>Facebook</strong><span>Social community</span></div>
-            <div class="plat-chk">✓</div>
-          </div>
-        </div>
-
-        <div class="gen-wrap">
-          <button class="btn-gen" id="genBtn" onclick="generate()">
-            <span id="genTxt">✦ Generate Poster &amp; Captions</span>
-          </button>
-        </div>
-      </div>
-
-        <!-- Results -->
-        <div id="results">
-          <div class="results-label">Your <em>generated content</em></div>
-          <div class="results-grid">
-            <div class="poster-panel">
-              <div class="poster-frame" id="posterFrame" onclick="openPosterInTab()">
-                <div class="poster-overlay"><span>↗ Open in new tab</span></div>
-              </div>
-              <div class="poster-btns">
-                <button class="btn-act" onclick="regenerateImage()">🔄 Regenerate</button>
-                <button class="btn-act" onclick="downloadImage()">⬇ Download</button>
-              </div>
-            </div>
-            <div class="captions-col" id="capsCol"></div>
-          </div>
-          <!-- Single unified Post button (shown after generation) -->
-          <button class="btn-post-all" id="postAllBtn" onclick="postAll()" style="display:none;">
-            <span id="postAllTxt">🚀 Post to Selected Platforms</span>
-          </button>
-          <div id="postResults" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;"></div>
-        </div>
-
-      </div><!-- /creator-wrap -->
-    </div><!-- /hero-content -->
-  </section>
-
-
-</div><!-- /app -->
-
-<!-- ─── SETTINGS MODAL ────────────────────────────────────── -->
-<div class="modal-bg" id="modal" onclick="if(event.target===this)closeSettings()">
-  <div class="modal" onclick="event.stopPropagation()">
-
-    <!-- Header -->
-    <div class="modal-head">
-      <div class="modal-head-text">
-        <h2>Settings</h2>
-        <p>Keys are saved locally — never sent to any third party.</p>
-      </div>
-      <button class="btn-close" onclick="closeSettings()">✕</button>
+      <div id="status" class="status"></div>
     </div>
 
-    <!-- Body -->
-    <div class="modal-body">
-
-      <!-- AI Engine -->
-      <div>
-        <div class="modal-section-title">AI Engine</div>
-        <div class="mf">
-          <label>Groq API Key</label>
-          <input type="password" id="kOAI" placeholder="gsk_..."/>
-          <div class="mf-hint">Get a free key at <a href="https://console.groq.com" target="_blank">console.groq.com</a></div>
-        </div>
-        <div class="mf">
-          <label>Model</label>
-          <select id="kModel">
-            <option value="llama-3.3-70b-versatile">Llama 3.3 70B — Best quality</option>
-            <option value="llama-3.1-8b-instant">Llama 3.1 8B — Fastest</option>
-            <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
-            <option value="gemma2-9b-it">Gemma 2 9B</option>
-          </select>
-        </div>
-        <div class="mf">
-          <label>Backend URL</label>
-          <input type="text" id="kBackend" placeholder="http://localhost:8000"/>
-          <div class="mf-hint">Run <code>uvicorn main:app --reload</code> in the <code>backend/</code> folder.</div>
-        </div>
+    <div id="captions-section" class="captions-section panel">
+      <p class="panel-title">Captions</p>
+      <div class="caption-tabs" id="caption-tabs"></div>
+      <div class="caption-row">
+        <button class="copy-btn" onclick="copyCaption()">Copy</button>
       </div>
-
-      <!-- Image AI Provider -->
-      <div>
-        <div class="modal-section-title">Image AI</div>
-        <div class="mf">
-          <label>Provider</label>
-          <select id="kImgProvider" onchange="toggleImgProviderFields()">
-            <option value="pollinations">Pollinations — Free (no key needed)</option>
-            <option value="gemini">Google Gemini Imagen 3 — Best quality (free key)</option>
-          </select>
-          <div class="mf-hint">Gemini Imagen 3 produces significantly better marketing visuals.</div>
-        </div>
-        <div class="mf" id="mfGeminiKey" style="display:none;">
-          <label>Google AI Studio Key</label>
-          <input type="password" id="kGeminiKey" placeholder="AIza..."/>
-          <div class="mf-hint">Free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> — takes 30 seconds.</div>
-        </div>
-      </div>
-
-      <!-- LinkedIn -->
-      <div>
-        <div class="modal-section-title">LinkedIn</div>
-        <div class="mf">
-          <label>Access Token</label>
-          <input type="password" id="kLI" placeholder="AQX..."/>
-        </div>
-        <div class="mf">
-          <label>Person URN</label>
-          <input type="text" id="kLIUrn" placeholder="urn:li:person:XXXXXXX"/>
-        </div>
-      </div>
-
-      <!-- Facebook -->
-      <div>
-        <div class="modal-section-title">Facebook</div>
-        <div class="mf">
-          <label>Page Access Token</label>
-          <input type="password" id="kFB" placeholder="EAA..."/>
-        </div>
-        <div class="mf">
-          <label>Page ID</label>
-          <input type="text" id="kFBPage" placeholder="123456789"/>
-        </div>
-      </div>
-
-      <!-- Instagram -->
-      <div>
-        <div class="modal-section-title">Instagram</div>
-        <div class="mf">
-          <label>Business Account ID</label>
-          <input type="text" id="kIG" placeholder="17841..."/>
-          <div class="mf-hint">Connect your Instagram Business account via Facebook.</div>
-        </div>
-      </div>
-
+      <div class="caption-content" id="caption-text"></div>
     </div>
-
-    <!-- Footer -->
-    <div class="modal-foot">
-      <button class="btn-mcancel" onclick="closeSettings()">Cancel</button>
-      <button class="btn-msave" onclick="saveSettings()">Save Settings</button>
-    </div>
-
   </div>
-</div>
 
-<div id="toast"></div>
+  <!-- Right: Image preview -->
+  <div class="panel" style="padding:16px;">
+    <p class="panel-title">Preview</p>
+    <div class="image-box" id="image-box">
+      <div class="placeholder-icon">&#128444;</div>
+      <span>Your image will appear here</span>
+    </div>
+    <a id="open-link" class="open-link" href="#" target="_blank" style="display:none;">
+      &#8599; Open full size
+    </a>
+  </div>
+
+</main>
 
 <script>
-/* ─── SPLASH ──────────────────────────────────────────────── */
-const msgs = ['Initializing engine...','Loading AI models...','Warming up Groq...','Almost ready...'];
-let mi = 0;
-const sEl = document.getElementById('splashStatus');
-const si = setInterval(() => { sEl.textContent = msgs[Math.min(++mi, msgs.length-1)]; }, 620);
+  let currentCaptions = {};
+  let activeCaptionKey = "";
 
-window.addEventListener('load', () => {
-  setTimeout(() => {
-    clearInterval(si);
-    document.getElementById('splash').classList.add('hide');
-    document.getElementById('app').classList.add('show');
-  }, 2800);
-});
+  async function generate() {
+    const prompt = document.getElementById("prompt").value.trim();
+    if (!prompt) { setStatus("Please enter a prompt first.", "error"); return; }
 
-/* ─── STATE ───────────────────────────────────────────────── */
-const DEFAULT_TONE  = 'professional';
-const DEFAULT_STYLE = 'modern and vibrant';
-let activePlatforms = new Set(['linkedin','instagram','facebook']);
-let generatedImageUrl = null;
+    const btn    = document.getElementById("gen-btn");
+    const btnTxt = document.getElementById("gen-btn-text");
+    const imgBox = document.getElementById("image-box");
 
-/* ─── SETTINGS ────────────────────────────────────────────── */
-const GROQ_API_BASE  = 'https://api.groq.com/openai/v1';
-const DEFAULT_MODEL  = 'llama-3.3-70b-versatile';
-const KEYS = {
-  kOAI:'oai', kModel:'model',
-  kImgProvider:'imgProvider', kGeminiKey:'geminiKey',
-  kLI:'li', kLIUrn:'liUrn', kFB:'fb', kFBPage:'fbPage', kIG:'ig'
-};
+    document.getElementById("captions-section").style.display = "none";
+    document.getElementById("open-link").style.display = "none";
+    btn.disabled = true;
+    btnTxt.innerHTML = '<div class="spinner"></div> Generating…';
+    setStatus("Sending to fal.ai FLUX — usually takes 15–30 seconds…", "info");
 
-const getKey = k => localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : k==='imgProvider' ? 'pollinations' : '');
+    imgBox.innerHTML = `
+      <div class="image-loading">
+        <div class="pulse-ring"></div>
+        <span>Generating with FLUX…</span>
+      </div>`;
 
-function toggleImgProviderFields() {
-  const v = document.getElementById('kImgProvider')?.value || 'pollinations';
-  const gEl = document.getElementById('mfGeminiKey');
-  if (gEl) gEl.style.display = v === 'gemini' ? '' : 'none';
-}
-
-function openSettings() {
-  Object.entries(KEYS).forEach(([id, k]) => {
-    const el = document.getElementById(id);
-    if (el) el.value = localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : k==='imgProvider' ? 'pollinations' : '');
-  });
-  toggleImgProviderFields();
-  document.getElementById('modal').classList.add('show');
-}
-
-function openSettings_old() {
-  // replaced — kept as dead code reference
-  document.getElementById('modal').classList.add('show');
-}
-function closeSettings() { document.getElementById('modal').classList.remove('show'); }
-function saveSettings() {
-  Object.entries(KEYS).forEach(([id, k]) => {
-    const el = document.getElementById(id);
-    if (el) localStorage.setItem('pk_'+k, el.value.trim());
-  });
-  closeSettings();
-  toast('✅ Settings saved!');
-}
-
-/* ─── SELECTIONS ──────────────────────────────────────────── */
-function togglePlat(card, id) {
-  if (activePlatforms.has(id)) {
-    if (activePlatforms.size === 1) { toast('⚠️ Keep at least one platform'); return; }
-    activePlatforms.delete(id);
-    card.classList.remove('active');
-    card.querySelector('.plat-chk').textContent = '';
-  } else {
-    activePlatforms.add(id);
-    card.classList.add('active');
-    card.querySelector('.plat-chk').textContent = '✓';
-  }
-}
-
-/* ─── TOAST ───────────────────────────────────────────────── */
-let tTimer;
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.innerHTML = `<span>${msg}</span>`;
-  el.classList.add('show');
-  clearTimeout(tTimer);
-  tTimer = setTimeout(() => el.classList.remove('show'), 3400);
-}
-
-/* ─── IMAGE GENERATION ─────────────────────────────────────── */
-
-async function genImageGemini(prompt, apiKey) {
-  /* Gemini Imagen 3 — called directly from browser, returns data:image URL */
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instances: [{ prompt: prompt + '. No text, no letters, no watermarks, no logos.' }],
-        parameters: { sampleCount: 1, aspectRatio: '4:5', safetyFilterLevel: 'block_few' }
-      })
-    }
-  );
-  if (!r.ok) {
-    const err = await r.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Gemini ${r.status}`);
-  }
-  const data = await r.json();
-  const b64  = data.predictions?.[0]?.bytesBase64Encoded;
-  if (!b64) throw new Error('Gemini returned no image');
-  return `data:image/png;base64,${b64}`;
-}
-
-async function genImagePollinations(prompt) {
-  /* Pollinations FLUX — free, URL-based, always works */
-  const full = `${prompt}, no text, no letters, no watermarks, no logos, ultra detailed, 8K, cinematic`;
-  const neg  = 'text,letters,watermark,logo,blurry,low quality,ugly,nsfw';
-  const seed = Math.floor(Math.random() * 999999);
-  const url  = `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=1024&height=1280&model=flux-pro&seed=${seed}&nologo=true&nofeed=true&negative=${encodeURIComponent(neg)}`;
-  /* Preload so errors are caught */
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload  = () => resolve(url);
-    img.onerror = () => resolve(url); // resolve anyway — image element will show error state
-    img.src = url;
-    setTimeout(() => resolve(url), 35000); // max wait 35s
-  });
-}
-
-async function generateImage(prompt) {
-  const provider  = getKey('imgProvider') || 'pollinations';
-  const geminiKey = getKey('geminiKey');
-  if (provider === 'gemini' && geminiKey) {
     try {
-      toast('🎨 Gemini Imagen 3 generating...');
-      return await genImageGemini(prompt, geminiKey);
-    } catch(e) {
-      toast(`⚠️ Gemini failed: ${e.message} — using Pollinations`);
-    }
-  }
-  toast('🎨 Generating image...');
-  return await genImagePollinations(prompt);
-}
-
-/* ─── GENERATE ────────────────────────────────────────────── */
-async function generate() {
-  const topic = document.getElementById('topicInput').value.trim();
-  if (!topic) { toast('⚠️ Please enter your topic first!'); return; }
-
-  const apiKey  = getKey('oai');
-  if (!apiKey) { toast('⚙️ Add your Groq API key in Settings first!'); openSettings(); return; }
-  const model     = getKey('model') || DEFAULT_MODEL;
-  const platforms = [...activePlatforms];
-
-  const btn = document.getElementById('genBtn');
-  btn.disabled = true;
-  document.getElementById('genTxt').innerHTML = '<div class="spin"></div>&nbsp;Generating...';
-  document.getElementById('results').classList.add('show');
-
-  const frame = document.getElementById('posterFrame');
-  frame.innerHTML = '<div class="skeleton" style="position:absolute;inset:0;"></div>';
-  generatedImageUrl = null;
-
-  const capsCol = document.getElementById('capsCol');
-  capsCol.innerHTML = platforms.map(() => `<div class="cap-card glass-card"><div class="cap-body"><div class="skeleton cap-sk"></div></div></div>`).join('');
-
-  try {
-    /* Step 1 — Groq: design config + captions in parallel */
-    const [designR, capR] = await Promise.allSettled([
-      groqDesign(apiKey, model, topic),
-      groqCaptions(apiKey, model, topic, platforms)
-    ]);
-
-    const design  = designR.status === 'fulfilled' ? designR.value : {};
-    const capData = capR.status   === 'fulfilled' ? capR.value   : {};
-
-    /* Step 2 — Image generation with selected provider */
-    const imagePrompt = design.image_prompt || `premium marketing visual for ${topic}, cinematic, dark luxury, 3D render`;
-    const bgUrl = await generateImage(imagePrompt);
-    generatedImageUrl = bgUrl || 'poster-ready';
-
-    /* Step 3 — Render poster */
-    frame.innerHTML = renderPosterHTML(design, design, bgUrl);
-
-    /* Step 4 — Captions */
-    capsCol.innerHTML = '';
-    if (platforms.some(p => capData[p])) {
-      platforms.forEach((p, i) => { if (capData[p]) capsCol.appendChild(makeCap(p, capData[p], i)); });
-    } else {
-      capsCol.innerHTML = `<div class="glass-card" style="padding:20px;color:var(--muted-fg);font-size:13px;">Captions failed — try again.</div>`;
-    }
-
-    const providerLabel = getKey('imgProvider') === 'gemini' ? 'Gemini Imagen 3' : 'Pollinations FLUX';
-    toast(`✦ Done! Image by ${providerLabel}`);
-
-  } catch(e) {
-    frame.innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--red);font-size:13px;padding:24px;text-align:center;">${e.message}</div>`;
-    toast('❌ ' + e.message);
-  }
-
-  btn.disabled = false;
-  document.getElementById('genTxt').innerHTML = '✦ Regenerate';
-  const postAllBtn = document.getElementById('postAllBtn');
-  if (postAllBtn) postAllBtn.style.display = 'flex';
-  document.getElementById('postResults').innerHTML = '';
-}
-
-/* ─── GROQ CALL (with 429 retry) ────────────────────────────── */
-async function groqCall(apiKey, body, maxRetries = 3) {
-  let delay = 6000;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const r = await fetch(`${GROQ_API_BASE}/chat/completions`, {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const d = await r.json();
-    if (r.ok) return d;
-    if (r.status === 429 && attempt < maxRetries) {
-      toast(`⏳ Rate limit — retrying in ${Math.round(delay/1000)}s...`);
-      await new Promise(res => setTimeout(res, delay));
-      delay = Math.min(delay * 2, 30000);
-      continue;
-    }
-    throw new Error(d.error?.message || `Groq error ${r.status}`);
-  }
-}
-
-/* ─── GROQ: Design config + image prompt ───────────────────── */
-async function groqDesign(apiKey, model, topic) {
-  const d = await groqCall(apiKey, {
-    model, temperature: 0.9, max_tokens: 800,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: 'You are a senior art director and AI image prompt engineer. Return only valid JSON.' },
-      { role: 'user', content:
-        `Design the visual config for a premium social media marketing poster about: "${topic}"\n\n` +
-        `Return JSON with these keys:\n` +
-        `- "template": "saas"|"cyber-ai"|"corporate"|"minimal"|"glassmorphism"\n` +
-        `- "primary_color": hex color fitting the topic\n` +
-        `- "secondary_color": complementary hex\n` +
-        `- "layout": "left-text"|"right-text"|"bottom-text"|"center-overlay"\n` +
-        `- "headline": ALL CAPS, max 5 words\n` +
-        `- "subheadline": max 8 words\n` +
-        `- "description": 1-2 sentences\n` +
-        `- "points": exactly 4 bullets, max 5 words each\n` +
-        `- "stat": metric like "500+" or "99%"\n` +
-        `- "stat_label": max 4 words\n` +
-        `- "cta": max 5 words\n` +
-        `- "image_prompt": A vivid 100-word paragraph describing a photorealistic 3D rendered scene for "${topic}". ` +
-        `Include: specific subjects (hologram, laptop, device, product), environment, neon lighting, materials, camera angle, cinematic mood. ` +
-        `Style: 8K octane render, Apple advertisement quality. No text, no letters, no logos.`
-      }
-    ]
-  });
-  const raw = d.choices?.[0]?.message?.content?.trim() || '{}';
-  try {
-    const parsed = JSON.parse(raw.replace(/^```json|```$/g,'').trim());
-    return parsed;
-  } catch {
-    return { template:'cyber-ai', primary_color:'#7c3aed', secondary_color:'#22d3ee',
-      layout:'bottom-text', headline: topic.toUpperCase().slice(0,30),
-      subheadline:'Professional. Powerful. Proven.', description:`Discover ${topic}.`,
-      points:['Top Quality','Expert Team','Fast Delivery','Best Value'],
-      stat:'100%', stat_label:'Client Satisfaction', cta:'Get Started Today',
-      image_prompt:`Cinematic 3D render for ${topic}. Glowing hologram, dark luxury studio, neon blue purple lighting, volumetric fog, ultra realistic 8K.`
-    };
-  }
-}
-
-/* ─── GROQ: Social media captions ──────────────────────────── */
-async function groqCaptions(apiKey, model, topic, platforms) {
-  const platList = platforms.join(', ');
-  const rules = platforms.map(p => ({
-    linkedin:  `"linkedin": professional, 5-8 hashtags, max 1300 chars`,
-    instagram: `"instagram": fun, emojis, 15-20 hashtags, max 2000 chars`,
-    facebook:  `"facebook": conversational, 3-5 hashtags, end with question, max 500 chars`
-  }[p])).filter(Boolean).join('\n');
-  const d = await groqCall(apiKey, {
-    model, temperature: 0.8, max_tokens: 2000,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: 'Expert social media copywriter. Return only valid JSON.' },
-      { role: 'user', content: `Write captions for: "${topic}"\nPlatforms: ${platList}\n${rules}\nReturn JSON with keys: ${platList}` }
-    ]
-  });
-  try {
-    const raw = d.choices?.[0]?.message?.content?.trim() || '{}';
-    return JSON.parse(raw.replace(/^```json|```$/g,'').trim());
-  } catch { return {}; }
-}
-
-/* ─── STRIP MARKDOWN ────────────────────────────────────────── */
-function clean(s){ return (s||'').replace(/\*\*/g,'').replace(/\*/g,'').replace(/#{1,6}\s?/g,'').replace(/`/g,'').trim(); }
-
-/* ═══════════════════════════════════════════════════════════════
-   POSTER RENDERER — 5 professional templates (Groq-selected)
-   content = poster_content, design = design_config, bgUrl = image_url
-   ═══════════════════════════════════════════════════════════════ */
-function renderPosterHTML(c, design, bgUrl) {
-  const tpl       = (design?.template       || 'saas').toLowerCase().replace(/\s/g,'-');
-  const primary   = design?.primary_color   || '#7c3aed';
-  const secondary = design?.secondary_color || '#22d3ee';
-  const layout    = design?.layout          || 'bottom-text';
-
-  /* hex → rgba helpers */
-  const hx = h => { const x=h.replace('#',''); return [parseInt(x.slice(0,2),16),parseInt(x.slice(2,4),16),parseInt(x.slice(4,6),16)]; };
-  const [pr,pg,pb] = hx(primary);
-  const [sr,sg,sb] = hx(secondary);
-  const p = a => `rgba(${pr},${pg},${pb},${a})`;
-  const s = a => `rgba(${sr},${sg},${sb},${a})`;
-
-  /* content */
-  const headline    = clean(c?.headline    || '');
-  const subheadline = clean(c?.subheadline || '');
-  const description = clean(c?.description || '');
-  const pts         = (c?.points||[]).slice(0,4).map(x=>clean(x));
-  const stat        = clean(c?.stat        || '');
-  const stat_label  = clean(c?.stat_label  || '');
-  const cta         = clean(c?.cta         || 'Get Started');
-  const icons       = ['🎯','⚡','💡','🚀'];
-
-  /* background image — with fallback from gptimage to flux-pro if load fails */
-  const fluxFallback = bgUrl ? bgUrl.replace('model=gptimage','model=flux-pro') + `&negative=${encodeURIComponent('text,watermark,logo,blurry,low quality')}` : '';
-  const bgEl = bgUrl
-    ? `<img src="${bgUrl}" crossorigin="anonymous"
-         style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;"
-         onerror="if(this.src!=='${fluxFallback}')this.src='${fluxFallback}'">`
-    : `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#030b1a,#0d0520);z-index:0;"></div>`;
-
-  /* overlay gradient — heavily darkens the text zone, lets image show on the visual side */
-  const ov = {
-    'left-text':      `linear-gradient(90deg,rgba(4,6,18,1) 0%,rgba(4,6,18,.98) 38%,rgba(4,6,18,.7) 56%,rgba(4,6,18,.2) 75%,transparent 100%)`,
-    'right-text':     `linear-gradient(270deg,rgba(4,6,18,1) 0%,rgba(4,6,18,.98) 38%,rgba(4,6,18,.7) 56%,rgba(4,6,18,.2) 75%,transparent 100%)`,
-    'bottom-text':    `linear-gradient(to top,rgba(4,6,18,1) 0%,rgba(4,6,18,1) 30%,rgba(4,6,18,.92) 48%,rgba(4,6,18,.5) 65%,rgba(4,6,18,.1) 82%,transparent 100%)`,
-    'center-overlay': `linear-gradient(170deg,rgba(4,6,18,.88),rgba(10,4,32,.80),rgba(4,6,18,.88))`,
-  };
-  const overlay = ov[layout] || ov['bottom-text'];
-
-  /* text panel CSS */
-  const pp = {
-    'left-text':      'position:absolute;left:0;top:0;width:54%;height:100%;z-index:5;display:flex;flex-direction:column;justify-content:center;padding:32px 18px 32px 28px;',
-    'right-text':     'position:absolute;right:0;top:0;width:54%;height:100%;z-index:5;display:flex;flex-direction:column;justify-content:center;padding:32px 28px 32px 18px;',
-    'bottom-text':    'position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;flex-direction:column;justify-content:flex-end;padding:20px 28px 32px;',
-    'center-overlay': 'position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:32px 24px;text-align:center;',
-  };
-  const panelPos   = pp[layout] || pp['bottom-text'];
-  const isCenter   = layout === 'center-overlay';
-  const isBottom   = layout === 'bottom-text';
-  const alignSelf  = isCenter ? 'center' : 'flex-start';
-  const maxPts     = isBottom ? 2 : 4;
-  const headSz     = isBottom ? '22px' : '27px';
-
-  /* shared keyframes */
-  const kf = `<style>
-    @keyframes pOrb  {0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-12px) scale(1.05)}}
-    @keyframes pPulse{0%,100%{opacity:.7}50%{opacity:1}}
-    @keyframes pSheen{0%{transform:translateX(-120%) rotate(25deg)}100%{transform:translateX(320%) rotate(25deg)}}
-    @keyframes pFade {from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes pBlink{0%,100%{opacity:1}50%{opacity:.3}}
-    @keyframes pGrid {0%,100%{opacity:.05}50%{opacity:.12}}
-  </style>`;
-
-  /* ── SAAS template ── */
-  if (tpl === 'saas') {
-    const ptList = pts.slice(0,maxPts).map((pt,i)=>`
-      <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;animation:pFade .5s ease both;animation-delay:${.1+i*.07}s;">
-        <div style="width:18px;height:18px;border-radius:5px;background:${p(.2)};border:1px solid ${p(.5)};display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;color:${primary};">✓</div>
-        <span style="font-size:11.5px;color:rgba(255,255,255,.82);font-weight:500;">${pt}</span>
-      </div>`).join('');
-    return kf + `
-    <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#040612;">
-      ${bgEl}
-      <div style="position:absolute;inset:0;background:${overlay};z-index:1;"></div>
-      <div style="position:absolute;inset:0;z-index:1;background-image:radial-gradient(circle,rgba(255,255,255,.06) 1px,transparent 1px);background-size:26px 26px;animation:pGrid 6s ease infinite;pointer-events:none;"></div>
-      <div style="position:absolute;top:-80px;right:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,${p(.5)},transparent 65%);z-index:2;animation:pOrb 7s ease-in-out infinite;pointer-events:none;"></div>
-      <div style="position:absolute;bottom:-50px;left:-30px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,${s(.25)},transparent 65%);z-index:2;animation:pOrb 9s ease-in-out infinite reverse;pointer-events:none;"></div>
-      <div style="position:absolute;right:18px;top:18px;z-index:6;font-size:9px;font-weight:800;letter-spacing:2.5px;color:${p(.55)};text-transform:uppercase;">PostAI</div>
-      <div style="${panelPos}">
-        <div style="display:inline-flex;align-items:center;gap:6px;background:${p(.15)};border:1px solid ${p(.45)};border-radius:20px;padding:4px 12px;margin-bottom:13px;align-self:${alignSelf};">
-          <div style="width:6px;height:6px;border-radius:50%;background:${primary};animation:pBlink 1.8s ease-in-out infinite;"></div>
-          <span style="font-size:9.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${primary};">Live Now</span>
-        </div>
-        <div style="font-size:${headSz};font-weight:900;letter-spacing:-.5px;line-height:1.1;color:#fff;margin-bottom:8px;text-shadow:0 2px 16px rgba(0,0,0,.8);">${headline}</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.72);margin-bottom:12px;font-weight:500;">${subheadline}</div>
-        <div style="width:40px;height:3px;border-radius:2px;background:linear-gradient(90deg,${primary},${secondary});margin-bottom:14px;${isCenter?'margin-left:auto;margin-right:auto;':''}"></div>
-        ${!isBottom?`<p style="font-size:11px;color:rgba(255,255,255,.58);line-height:1.5;margin-bottom:12px;${isCenter?'text-align:center;max-width:250px;':''}">${description}</p>`:''}
-        ${ptList}
-        ${stat?`<div style="display:inline-flex;flex-direction:column;align-items:${isCenter?'center':'flex-start'};margin-bottom:14px;margin-top:4px;"><span style="font-size:30px;font-weight:900;color:${primary};line-height:1;text-shadow:0 0 20px ${p(.6)};">${stat}</span><span style="font-size:9.5px;color:rgba(255,255,255,.55);margin-top:1px;letter-spacing:.5px;">${stat_label}</span></div>`:''}
-        <div style="display:inline-flex;align-items:center;gap:8px;background:${primary};border-radius:22px;padding:10px 20px;font-size:11.5px;font-weight:700;color:#fff;box-shadow:0 4px 18px ${p(.5)};position:relative;overflow:hidden;align-self:${alignSelf};">
-          <span style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);animation:pSheen 2.4s ease infinite;"></span>
-          ${cta} →
-        </div>
-      </div>
-    </div>`;
-  }
-
-  /* ── CYBER-AI template ── */
-  if (tpl === 'cyber-ai') {
-    const ptList = pts.slice(0,maxPts).map((pt,i)=>`
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;animation:pFade .5s ease both;animation-delay:${.1+i*.07}s;">
-        <div style="width:4px;height:4px;background:${secondary};border-radius:50%;box-shadow:0 0 6px ${secondary};flex-shrink:0;"></div>
-        <span style="font-size:11px;color:rgba(255,255,255,.8);font-weight:500;letter-spacing:.3px;">${pt}</span>
-      </div>`).join('');
-    return kf + `
-    <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#020a10;">
-      ${bgEl}
-      <div style="position:absolute;inset:0;background:${overlay};z-index:1;"></div>
-      <div style="position:absolute;inset:0;z-index:1;background:repeating-linear-gradient(0deg,transparent,transparent 39px,${s(.05)} 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,${s(.05)} 40px);pointer-events:none;"></div>
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${secondary},${primary},transparent);z-index:4;"></div>
-      <div style="position:absolute;top:28px;left:28px;width:14px;height:14px;border-top:2px solid ${secondary};border-left:2px solid ${secondary};z-index:5;"></div>
-      <div style="position:absolute;top:28px;right:28px;width:14px;height:14px;border-top:2px solid ${secondary};border-right:2px solid ${secondary};z-index:5;"></div>
-      <div style="position:absolute;bottom:28px;left:28px;width:14px;height:14px;border-bottom:2px solid ${secondary};border-left:2px solid ${secondary};z-index:5;"></div>
-      <div style="position:absolute;bottom:28px;right:28px;width:14px;height:14px;border-bottom:2px solid ${secondary};border-right:2px solid ${secondary};z-index:5;"></div>
-      <div style="position:absolute;right:20px;top:18px;z-index:6;font-size:8px;font-weight:700;letter-spacing:3px;color:${s(.5)};text-transform:uppercase;">PostAI //</div>
-      <div style="${panelPos}">
-        <div style="display:inline-flex;align-items:center;gap:6px;border:1px solid ${s(.5)};border-radius:3px;padding:3px 10px;margin-bottom:13px;align-self:${alignSelf};">
-          <span style="font-size:8.5px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${secondary};">SYS.ACTIVE</span>
-          <div style="width:5px;height:5px;border-radius:50%;background:${secondary};animation:pBlink 1s ease-in-out infinite;"></div>
-        </div>
-        <div style="font-size:${headSz};font-weight:900;letter-spacing:1px;line-height:1.1;color:#fff;margin-bottom:8px;text-shadow:0 0 30px ${p(.8)};">${headline}</div>
-        <div style="font-size:11.5px;color:${secondary};margin-bottom:12px;font-weight:600;letter-spacing:.5px;">${subheadline}</div>
-        <div style="width:50px;height:2px;background:${secondary};margin-bottom:14px;${isCenter?'margin-left:auto;margin-right:auto;':''}box-shadow:0 0 8px ${secondary};"></div>
-        ${!isBottom?`<p style="font-size:10.5px;color:rgba(255,255,255,.55);line-height:1.5;margin-bottom:12px;letter-spacing:.2px;">${description}</p>`:''}
-        ${ptList}
-        ${stat?`<div style="display:inline-flex;align-items:baseline;gap:6px;margin-bottom:14px;margin-top:2px;"><span style="font-size:32px;font-weight:900;color:${secondary};line-height:1;text-shadow:0 0 24px ${secondary};">${stat}</span><span style="font-size:9px;color:rgba(255,255,255,.45);letter-spacing:.5px;">${stat_label}</span></div>`:''}
-        <div style="display:inline-flex;align-items:center;gap:8px;border:1.5px solid ${secondary};border-radius:3px;padding:9px 18px;font-size:11px;font-weight:700;color:${secondary};letter-spacing:1px;text-transform:uppercase;position:relative;overflow:hidden;align-self:${alignSelf};background:${s(.08)};">
-          <span style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,${s(.18)},transparent);animation:pSheen 2s ease infinite;"></span>
-          ${cta} ›
-        </div>
-      </div>
-    </div>`;
-  }
-
-  /* ── CORPORATE template ── */
-  if (tpl === 'corporate') {
-    const ptList = pts.slice(0,maxPts).map((pt,i)=>`
-      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:9px;animation:pFade .5s ease both;animation-delay:${.1+i*.07}s;">
-        <div style="width:3px;height:3px;border-radius:50%;background:${primary};margin-top:5px;flex-shrink:0;"></div>
-        <span style="font-size:11.5px;color:rgba(255,255,255,.78);line-height:1.4;">${pt}</span>
-      </div>`).join('');
-    return kf + `
-    <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#060d1e;">
-      ${bgEl}
-      <div style="position:absolute;inset:0;background:${overlay};z-index:1;"></div>
-      <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(to bottom,${primary},${secondary},${primary});z-index:4;"></div>
-      <div style="position:absolute;right:20px;top:16px;z-index:6;font-size:8px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,.3);text-transform:uppercase;">PostAI</div>
-      <div style="${panelPos}">
-        <div style="font-size:8.5px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:${primary};margin-bottom:12px;">${stat_label || 'Enterprise Solution'}</div>
-        <div style="width:32px;height:2px;background:${primary};margin-bottom:14px;${isCenter?'margin-left:auto;margin-right:auto;':''}"></div>
-        <div style="font-size:${headSz};font-weight:800;letter-spacing:-.3px;line-height:1.1;color:#fff;margin-bottom:10px;">${headline}</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.65);margin-bottom:16px;font-style:italic;">${subheadline}</div>
-        ${!isBottom?`<p style="font-size:11px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:14px;">${description}</p>`:''}
-        ${ptList}
-        ${stat?`<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:10px 0;border-top:1px solid rgba(255,255,255,.1);border-bottom:1px solid rgba(255,255,255,.1);"><span style="font-size:34px;font-weight:900;color:${primary};">${stat}</span><span style="font-size:10px;color:rgba(255,255,255,.5);line-height:1.3;max-width:80px;">${stat_label}</span></div>`:''}
-        <div style="display:inline-flex;align-items:center;background:${primary};padding:10px 22px;font-size:11px;font-weight:600;color:#fff;letter-spacing:.5px;align-self:${alignSelf};">
-          ${cta} →
-        </div>
-      </div>
-    </div>`;
-  }
-
-  /* ── MINIMAL template ── */
-  if (tpl === 'minimal') {
-    const ptList = pts.slice(0,maxPts).map((pt,i)=>`
-      <div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:7px;padding-left:12px;border-left:2px solid ${p(.4)};animation:pFade .5s ease both;animation-delay:${.1+i*.07}s;">${pt}</div>`).join('');
-    return kf + `
-    <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#080808;">
-      ${bgEl}
-      <div style="position:absolute;inset:0;background:${overlay};z-index:1;"></div>
-      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${primary};z-index:4;"></div>
-      <div style="position:absolute;right:20px;top:18px;z-index:6;font-size:8px;font-weight:500;letter-spacing:3px;color:rgba(255,255,255,.25);text-transform:uppercase;">PostAI</div>
-      <div style="${panelPos}">
-        ${stat?`<div style="font-size:52px;font-weight:900;color:${primary};line-height:1;margin-bottom:8px;letter-spacing:-2px;">${stat}</div>`:''}
-        <div style="font-size:${headSz};font-weight:700;line-height:1.15;color:#fff;margin-bottom:8px;letter-spacing:-.3px;">${headline}</div>
-        <div style="width:30px;height:2px;background:${primary};margin-bottom:12px;${isCenter?'margin-left:auto;margin-right:auto;':''}"></div>
-        <div style="font-size:11.5px;color:rgba(255,255,255,.6);margin-bottom:14px;line-height:1.5;">${subheadline}</div>
-        ${ptList}
-        <div style="display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.25);padding:9px 20px;font-size:11px;color:rgba(255,255,255,.8);margin-top:10px;align-self:${alignSelf};letter-spacing:.5px;">
-          ${cta} →
-        </div>
-      </div>
-    </div>`;
-  }
-
-  /* ── GLASSMORPHISM template (default) ── */
-  const ptList = pts.slice(0,maxPts).map((pt,i)=>`
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;animation:pFade .5s ease both;animation-delay:${.1+i*.07}s;">
-      <div style="width:16px;height:16px;border-radius:50%;background:${p(.25)};border:1px solid ${p(.5)};display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;">${icons[i]||'•'}</div>
-      <span style="font-size:11px;color:rgba(255,255,255,.85);font-weight:500;">${pt}</span>
-    </div>`).join('');
-  return kf + `
-  <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#0a0520;">
-    ${bgEl}
-    <div style="position:absolute;inset:0;background:${overlay};z-index:1;"></div>
-    <div style="position:absolute;top:-120px;right:-80px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,${p(.45)},transparent 65%);z-index:2;animation:pOrb 8s ease-in-out infinite;filter:blur(2px);pointer-events:none;"></div>
-    <div style="position:absolute;bottom:-80px;left:-50px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,${s(.3)},transparent 65%);z-index:2;animation:pOrb 10s ease-in-out infinite reverse;filter:blur(2px);pointer-events:none;"></div>
-    <div style="position:absolute;right:18px;top:18px;z-index:6;font-size:9px;font-weight:700;letter-spacing:2px;color:${p(.5)};text-transform:uppercase;">PostAI</div>
-    <div style="${panelPos}">
-      <div style="background:rgba(255,255,255,.07);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:${isBottom?'18px 20px':'22px'};display:flex;flex-direction:column;">
-        <div style="display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;align-self:${alignSelf};">
-          <div style="width:6px;height:6px;border-radius:50%;background:${secondary};box-shadow:0 0 8px ${secondary};animation:pBlink 2s ease-in-out infinite;"></div>
-          <span style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${secondary};">PostAI Studio</span>
-        </div>
-        <div style="font-size:${headSz};font-weight:900;line-height:1.1;color:#fff;margin-bottom:7px;letter-spacing:-.3px;">${headline}</div>
-        <div style="font-size:11.5px;color:rgba(255,255,255,.65);margin-bottom:12px;">${subheadline}</div>
-        <div style="height:1px;background:linear-gradient(90deg,${p(.4)},${s(.3)},transparent);margin-bottom:12px;"></div>
-        ${ptList}
-        ${stat?`<div style="display:flex;align-items:center;gap:10px;margin-top:4px;margin-bottom:12px;"><span style="font-size:28px;font-weight:900;color:${primary};text-shadow:0 0 20px ${p(.7)};">${stat}</span><span style="font-size:9.5px;color:rgba(255,255,255,.5);">${stat_label}</span></div>`:''}
-        <div style="display:inline-flex;align-items:center;background:linear-gradient(135deg,${primary},${secondary});border-radius:24px;padding:9px 18px;font-size:11px;font-weight:700;color:#fff;align-self:${alignSelf};box-shadow:0 4px 18px ${p(.45)};position:relative;overflow:hidden;">
-          <span style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent);animation:pSheen 2.5s ease infinite;"></span>
-          ${cta} →
-        </div>
-      </div>
-    </div>
-  </div>`;
-}
-
-/* ─── CAPTIONS: Groq ──────────────────────────────────────── */
-async function genCaptions(apiKey, model, topic, t, platforms) {
-  const platList = platforms.join(', ');
-  const d = await geminiCall(apiKey, {
-    model, temperature: 0.8, max_tokens: 2048,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content:
-        'You are an expert social media copywriter. Always respond with a valid JSON object only — no markdown, no explanation, no code fences, no extra text.'
-      },
-      { role: 'user', content:
-        `Write engaging social media captions for the following topic: "${topic}"\n\n` +
-        `Create captions ONLY for these platforms: ${platList}\n\n` +
-        `Requirements:\n` +
-        (platforms.includes('linkedin')  ? `- "linkedin": professional tone, line breaks for readability, 5-8 relevant hashtags, max 1300 chars\n` : '') +
-        (platforms.includes('instagram') ? `- "instagram": fun & visual, emojis throughout the text, 15-20 hashtags at the very end, max 2000 chars\n` : '') +
-        (platforms.includes('facebook')  ? `- "facebook": conversational & friendly, 3-5 hashtags, end with a question to boost engagement, max 500 chars\n` : '') +
-        `\nReturn ONLY a JSON object with keys: ${platList}. Each value is the caption string for that platform.`
-      }
-    ]
-  });
-
-  let content = d.choices?.[0]?.message?.content?.trim() || '';
-  console.log('Groq raw caption response:', content);
-
-  // Strip any accidental markdown fences
-  content = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-  // Extract JSON if wrapped in extra text
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (jsonMatch) content = jsonMatch[0];
-
-  let parsed;
-  try {
-    parsed = JSON.parse(content);
-  } catch(e) {
-    console.error('JSON parse failed. Raw content:', content);
-    throw new Error('Caption parsing failed — try again');
-  }
-
-  // Validate at least one platform key exists
-  const hasAny = platforms.some(p => parsed[p]);
-  if (!hasAny) {
-    console.error('No platform keys in response:', parsed);
-    throw new Error('AI did not return captions for the selected platforms');
-  }
-
-  return parsed;
-}
-
-/* ─── CAPTION CARD ────────────────────────────────────────── */
-function makeCap(platform, text, idx) {
-  const cfg = {
-    linkedin:  { label:'LinkedIn',  cls:'li', icon:'in', btnLabel:'Post to LinkedIn'  },
-    instagram: { label:'Instagram', cls:'ig', icon:'📷', btnLabel:'Post to Instagram' },
-    facebook:  { label:'Facebook',  cls:'fb', icon:'f',  btnLabel:'Post to Facebook'  },
-  }[platform];
-  const div = document.createElement('div');
-  div.className = 'cap-card glass-card';
-  div.style.animationDelay = (idx * 0.1) + 's';
-  div.innerHTML = `
-    <div class="cap-head" onclick="this.parentElement.classList.toggle('collapsed')">
-      <div class="cap-ico ${cfg.cls}">${cfg.icon}</div>
-      <div class="cap-name">${cfg.label}</div>
-      <div class="cap-len" id="cl-${platform}">${text.length} chars</div>
-      <div class="cap-chev">▾</div>
-    </div>
-    <div class="cap-body">
-      <textarea class="cap-ta" id="cap-${platform}"
-        oninput="document.getElementById('cl-${platform}').textContent=this.value.length+' chars'"
-      >${text}</textarea>
-      <div class="cap-foot">
-        <button class="btn-cpy" onclick="copyCaption('${platform}')">📋 Copy Caption</button>
-        <span class="post-badge" id="badge-${platform}"></span>
-      </div>
-    </div>`;
-  return div;
-}
-
-function copyCaption(p) {
-  const v = document.getElementById('cap-' + p)?.value;
-  if (!v) return;
-  navigator.clipboard.writeText(v).then(() => toast('📋 Copied!'));
-}
-
-async function regenerateImage() {
-  const topic = document.getElementById('topicInput').value.trim();
-  if (!topic) { toast('⚠️ Enter a topic first'); return; }
-  const apiKey = getKey('oai'), model = getKey('model') || DEFAULT_MODEL;
-  if (!apiKey) { toast('⚙️ Add your Groq API key in Settings first!'); openSettings(); return; }
-  const frame = document.getElementById('posterFrame');
-  frame.innerHTML = '<div class="skeleton" style="position:absolute;inset:0;"></div>';
-  generatedImageUrl = null;
-  try {
-    const design = await groqDesign(apiKey, model, topic);
-    const bgUrl  = await generateImage(design.image_prompt || topic);
-    frame.innerHTML = renderPosterHTML(design, design, bgUrl);
-    generatedImageUrl = bgUrl || 'poster-ready';
-    toast('🎨 New poster generated!');
-  } catch(e) { toast('❌ ' + (e.message || e)); }
-}
-
-async function openPosterInTab() {
-  const el = document.querySelector('.poster-design');
-  if (!el) { toast('⚠️ Generate a poster first'); return; }
-  toast('⏳ Opening poster...');
-  try {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-    document.head.appendChild(script);
-    await new Promise((res, rej) => { script.onload = res; script.onerror = rej; });
-    const canvas = await html2canvas(el, { useCORS: true, allowTaint: true, scale: 2, backgroundColor: null });
-    const dataUrl = canvas.toDataURL('image/png');
-    const win = window.open();
-    win.document.write(`<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${dataUrl}" style="max-height:100vh;max-width:100%;object-fit:contain;"></body></html>`);
-    win.document.close();
-  } catch(e) {
-    toast('❌ Could not open poster: ' + e.message);
-  }
-}
-
-async function downloadImage() {
-  const el = document.querySelector('.poster-design');
-  if (!el) { toast('⚠️ Generate a poster first'); return; }
-  toast('⏳ Preparing download...');
-  try {
-    if (!window.html2canvas) {
-      await new Promise((res, rej) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        s.onload = res; s.onerror = rej;
-        document.head.appendChild(s);
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
       });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Server error " + res.status);
+      }
+
+      const data = await res.json();
+
+      imgBox.innerHTML = `<img src="${esc(data.image_url)}" alt="Generated"
+        onclick="window.open('${esc(data.image_url)}', '_blank')"
+        title="Click to open full size" />`;
+
+      const link = document.getElementById("open-link");
+      link.href = data.image_url;
+      link.style.display = "block";
+
+      setStatus("✅ Done! Click the image to open full size.", "ok");
+
+      if (data.captions && Object.keys(data.captions).length) {
+        currentCaptions = data.captions;
+        renderCaptions();
+        document.getElementById("captions-section").style.display = "block";
+      }
+
+    } catch (e) {
+      imgBox.innerHTML = `<div class="placeholder-icon">⚠️</div><span style="padding:0 16px;text-align:center;">${escHtml(e.message)}</span>`;
+      setStatus("❌ " + e.message, "error");
+    } finally {
+      btn.disabled = false;
+      btnTxt.innerHTML = "&#9654;&nbsp; Generate with FLUX";
     }
-    const canvas = await html2canvas(el, {
-      useCORS: true, allowTaint: true,
-      backgroundColor: '#06091a', scale: 2,
-      width: el.offsetWidth, height: el.offsetHeight
+  }
+
+  function renderCaptions() {
+    const keys = Object.keys(currentCaptions);
+    if (!keys.length) return;
+    activeCaptionKey = keys[0];
+
+    document.getElementById("caption-tabs").innerHTML = keys.map(k => `
+      <button class="caption-tab ${k === activeCaptionKey ? "active" : ""}"
+        onclick="selectCaption('${k}', this)">${k.charAt(0).toUpperCase() + k.slice(1)}</button>`
+    ).join("");
+
+    document.getElementById("caption-text").textContent = currentCaptions[activeCaptionKey] || "";
+  }
+
+  function selectCaption(key, el) {
+    document.querySelectorAll(".caption-tab").forEach(t => t.classList.remove("active"));
+    el.classList.add("active");
+    activeCaptionKey = key;
+    document.getElementById("caption-text").textContent = currentCaptions[key] || "";
+  }
+
+  function copyCaption() {
+    const text = currentCaptions[activeCaptionKey];
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.querySelector(".copy-btn");
+      const old = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => btn.textContent = old, 1500);
     });
-    const a = document.createElement('a');
-    a.href = canvas.toDataURL('image/png');
-    a.download = 'postai-poster.png'; a.click();
-    toast('✅ Poster downloaded!');
-  } catch(e) {
-    console.error('Download failed:', e);
-    toast('❌ Download failed — try right-clicking the poster to save');
   }
-}
 
-/* ─── POST ALL ────────────────────────────────────────────── */
-async function postAll() {
-  const platforms = [...activePlatforms].filter(p => document.getElementById('cap-' + p));
-  if (!platforms.length) { toast('⚠️ No captions to post'); return; }
-
-  const btn = document.getElementById('postAllBtn');
-  const txt = document.getElementById('postAllTxt');
-  btn.disabled = true;
-  txt.innerHTML = '<div class="spin"></div>&nbsp;Posting to all platforms...';
-
-  const container = document.getElementById('postResults');
-  container.style.display = 'flex';
-  container.innerHTML = platforms.map(p =>
-    `<div class="plat-post-result ing" id="pr-${p}">⏳ ${p.charAt(0).toUpperCase()+p.slice(1)}...</div>`
-  ).join('');
-
-  await Promise.all(platforms.map(async p => {
-    const el = document.getElementById('pr-' + p);
-    const label = p.charAt(0).toUpperCase() + p.slice(1);
-    try {
-      await postTo(p, true);
-      el.className = 'plat-post-result ok';
-      el.textContent = '✅ ' + label + ' posted!';
-    } catch(e) {
-      el.className = 'plat-post-result err';
-      el.textContent = '❌ ' + label + ': ' + e.message;
-    }
-  }));
-
-  btn.disabled = false;
-  txt.innerHTML = '🚀 Post to Selected Platforms';
-  toast('🎉 Done posting!');
-}
-
-/* ─── POST TO PLATFORMS ───────────────────────────────────── */
-async function postTo(p, silent = false) {
-  const cap = document.getElementById('cap-' + p)?.value;
-  if (!cap) return;
-  if (p === 'linkedin')  await postLinkedIn(cap);
-  if (p === 'facebook')  await postFacebook(cap);
-  if (p === 'instagram') await postInstagram(cap);
-}
-
-async function postLinkedIn(caption) {
-  const token = getKey('li'), urn = getKey('liUrn');
-  if (!token || !urn) throw new Error('LinkedIn keys not set in ⚙ Settings');
-  const r = await fetch('https://api.linkedin.com/v2/ugcPosts', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', 'X-Restli-Protocol-Version': '2.0.0' },
-    body: JSON.stringify({ author: urn, lifecycleState: 'PUBLISHED',
-      specificContent: { 'com.linkedin.ugc.ShareContent': { shareCommentary: { text: caption }, shareMediaCategory: 'NONE' } },
-      visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' } })
-  });
-  if (!r.ok) { const d = await r.json(); throw new Error(d.message || 'LinkedIn error'); }
-}
-
-async function postFacebook(caption) {
-  const token = getKey('fb'), pageId = getKey('fbPage');
-  if (!token || !pageId) throw new Error('Facebook keys not set in ⚙ Settings');
-  const url = generatedImageUrl
-    ? `https://graph.facebook.com/v19.0/${pageId}/photos`
-    : `https://graph.facebook.com/v19.0/${pageId}/feed`;
-  const payload = generatedImageUrl
-    ? { url: generatedImageUrl, caption, access_token: token }
-    : { message: caption, access_token: token };
-  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-  if (!r.ok) { const d = await r.json(); throw new Error(d.error?.message || 'Facebook error'); }
-}
-
-async function postInstagram(caption) {
-  const token = getKey('fb'), igId = getKey('ig');
-  if (!token || !igId) throw new Error('Instagram keys not set in ⚙ Settings');
-  if (!generatedImageUrl) throw new Error('Instagram requires an image — generate one first');
-  const cR = await fetch(`https://graph.facebook.com/v19.0/${igId}/media`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image_url: generatedImageUrl, caption, access_token: token })
-  });
-  const cD = await cR.json();
-  if (!cR.ok) throw new Error(cD.error?.message || 'Container error');
-  for (let i = 0; i < 10; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    const sR = await fetch(`https://graph.facebook.com/v19.0/${cD.id}?fields=status_code&access_token=${token}`);
-    const sD = await sR.json();
-    if (sD.status_code === 'FINISHED') break;
-    if (sD.status_code === 'ERROR') throw new Error('Instagram processing failed');
+  function setStatus(msg, type) {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = "status " + type;
   }
-  const pR = await fetch(`https://graph.facebook.com/v19.0/${igId}/media_publish`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ creation_id: cD.id, access_token: token })
+
+  function esc(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function escHtml(s) { return esc(s); }
+
+  document.getElementById("prompt").addEventListener("keydown", e => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) generate();
   });
-  if (!pR.ok) { const d = await pR.json(); throw new Error(d.error?.message || 'Publish error'); }
-}
 </script>
+
 </body>
 </html>

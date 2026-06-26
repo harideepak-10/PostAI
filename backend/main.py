@@ -4,11 +4,14 @@ Orchestrates: Groq (3 parallel calls) → Pollinations image → returns to fron
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import httpx
 import asyncio
 import json
 import random
 import urllib.parse
+import os
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -141,41 +144,46 @@ async def gen_captions(client: httpx.AsyncClient, api_key: str, model: str, topi
 
 # ── Task 3: Design configuration + image prompt ────────────────────────────────
 
+DESIGN_SYSTEM_PROMPT = """You are a senior art director and AI image prompt engineer at a top-tier design agency.
+Your image prompts produce COMPLETE, VISUALLY RICH marketing poster artwork — not simple backgrounds.
+Every prompt you write results in a premium, agency-quality visual suitable for a Fortune 500 campaign.
+Return only valid JSON."""
+
+DESIGN_USER_PROMPT = """Design the complete visual configuration for a professional social media marketing poster about: "{topic}"
+
+Return JSON with exactly these keys:
+- "template": one of "saas" | "cyber-ai" | "corporate" | "minimal" | "glassmorphism" — pick the most fitting for this topic
+- "primary_color": hex color matching the topic theme
+- "secondary_color": complementary accent hex color
+- "layout": one of "left-text" | "right-text" | "bottom-text" | "center-overlay"
+- "image_style": one of "hologram" | "mockup" | "abstract-tech" | "business-illustration" | "product-scene"
+- "image_prompt": A COMPLETE, DETAILED image generation prompt. Follow this exact framework:
+
+  You are a professional graphic designer. Convert the topic into a complete marketing poster visual.
+  Generate a premium futuristic advertisement visual — NOT a simple background or abstract pattern.
+
+  The image MUST include ALL of these elements relevant to "{topic}":
+  SUBJECTS: Specific, realistic subjects (3D AI hologram, floating laptop with glowing dashboard, mobile screens, product mockups, professional person, or industry-specific hero element)
+  ATMOSPHERE: Dark luxury background with neon gradients, glassmorphism panels, glowing UI elements, floating particles, depth of field
+  LIGHTING: Cinematic volumetric lighting, neon rim lights, dramatic shadows, lens flares, god rays, realistic reflections
+  COMPOSITION: Strong visual hierarchy — hero subject occupies 60-70% of the image, leaving deliberate dark space on one side for text overlay. Magazine-quality composition.
+  STYLE: Photorealistic 3D render, 8K resolution, ultra-detailed, professional CGI, premium branding aesthetic, social media advertisement quality
+  QUALITY MARKERS: Hyperrealistic, octane render, unreal engine 5 quality, cinematic color grading, studio lighting setup
+
+  STRICTLY FORBIDDEN: text, words, letters, watermarks, logos, UI buttons, navigation bars, typed content
+
+  Output the prompt as comma-separated descriptive tags, 100-150 words. Make it extremely specific to "{topic}"."""
+
+
 async def gen_design_config(client: httpx.AsyncClient, api_key: str, model: str, topic: str) -> dict:
     d = await groq_call(client, api_key, {
         "model": model,
-        "temperature": 0.85,
-        "max_tokens": 700,
+        "temperature": 0.9,
+        "max_tokens": 900,
         "response_format": {"type": "json_object"},
         "messages": [
-            {
-                "role": "system",
-                "content": "You are a professional graphic designer and AI image prompt engineer. Return only valid JSON."
-            },
-            {
-                "role": "user",
-                "content": (
-                    f'Design the visual configuration for a social media marketing poster about: "{topic}"\n\n'
-                    "Return JSON with exactly these keys:\n"
-                    '- "template": one of "saas" | "cyber-ai" | "corporate" | "minimal" | "glassmorphism" — pick the most fitting\n'
-                    '- "primary_color": hex color matching the topic theme (e.g. "#7c3aed")\n'
-                    '- "secondary_color": complementary hex color\n'
-                    '- "layout": one of "left-text" | "right-text" | "bottom-text" | "center-overlay"\n'
-                    '- "image_style": one of "hologram" | "mockup" | "abstract-tech" | "business-illustration" | "product-scene"\n'
-                    '- "image_prompt": You are a professional graphic designer. Create a detailed image prompt for a '
-                    f'HIGH-QUALITY visual asset for a marketing poster about "{topic}". '
-                    "This image is the hero visual — NOT a simple background. Include:\n"
-                    f"  * Specific visual subject relevant to {topic} (AI hologram, laptop mockup, product, tech scene, etc.)\n"
-                    "  * Professional 3D render or cinematic photography style\n"
-                    "  * Dramatic cinematic lighting, volumetric light rays\n"
-                    "  * Rich color grading matching the primary_color\n"
-                    "  * Deliberate empty/dark space on the opposite side for text overlay\n"
-                    "  * Ultra high quality, 8K, photorealistic or premium digital art\n"
-                    "  * Premium branding aesthetic (luxury, tech, corporate, minimal)\n"
-                    "  * Absolutely NO text, NO letters, NO watermarks, NO logos, NO UI elements\n"
-                    "  Output as comma-separated tags, 80-120 words."
-                )
-            }
+            {"role": "system", "content": DESIGN_SYSTEM_PROMPT},
+            {"role": "user",   "content": DESIGN_USER_PROMPT.format(topic=topic)},
         ]
     })
     try:
@@ -187,7 +195,13 @@ async def gen_design_config(client: httpx.AsyncClient, api_key: str, model: str,
             "secondary_color": "#22d3ee",
             "layout": "bottom-text",
             "image_style": "abstract-tech",
-            "image_prompt": f"premium dark background, {topic}, cinematic lighting, deep blue tones, no text, no watermark"
+            "image_prompt": (
+                f"premium futuristic technology advertisement visual, {topic}, realistic 3D AI hologram, "
+                "laptop displaying modern dashboard, glowing digital network connections, dark luxury background, "
+                "blue and purple neon gradients, glassmorphism panels, cinematic volumetric lighting, "
+                "floating particles, holographic effects, depth of field, ultra detailed, 8K, photorealistic, "
+                "no text, no watermark, no logo"
+            )
         }
 
 
@@ -195,11 +209,20 @@ async def gen_design_config(client: httpx.AsyncClient, api_key: str, model: str,
 
 async def gen_background_image(image_prompt: str, seed: Optional[int] = None) -> str:
     seed = seed or random.randint(0, 999999)
-    full_prompt = f"{image_prompt}, no text, no words, no letters, no watermark, no logo, ultra detailed, 8k quality"
-    negative    = "text, words, letters, watermark, logo, signature, url, copyright, blurry, low quality, ugly, deformed, nsfw"
+    full_prompt = (
+        f"{image_prompt}, "
+        "complete premium marketing poster visual, professional CGI, photorealistic 3D render, "
+        "cinematic lighting, ultra detailed, 8K resolution, high quality, "
+        "no text, no words, no letters, no watermark, no logo, no signature"
+    )
+    negative = (
+        "text, words, letters, alphabet, typography, watermark, logo, signature, url, website, "
+        "copyright symbol, blurry, low quality, ugly, deformed, distorted, noisy, pixelated, "
+        "simple background, abstract shapes only, empty design, stock photo, clipart, cartoon, nsfw"
+    )
 
-    prompt_enc  = urllib.parse.quote(full_prompt)
-    neg_enc     = urllib.parse.quote(negative)
+    prompt_enc = urllib.parse.quote(full_prompt)
+    neg_enc    = urllib.parse.quote(negative)
 
     url = (
         f"https://image.pollinations.ai/prompt/{prompt_enc}"
@@ -242,9 +265,22 @@ async def health():
     return {"status": "ok", "service": "PostAI Backend"}
 
 
+# ── Serve frontend static files ─────────────────────────────────────────────────
+
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "public")
+
+@app.get("/")
+async def serve_index():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+# Mount any other static assets (css, images, etc.) if present
+if os.path.isdir(FRONTEND_DIR):
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
+
 # ── Run ─────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(__import__("os").getenv("PORT", 8000))
+    port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

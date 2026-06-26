@@ -1058,54 +1058,53 @@ async function geminiCall(apiKey, body, maxRetries = 4) {
   }
 }
 
-/* ─── IMAGE PROMPT: Gemini → detailed visual prompt ───────── */
+/* ─── IMAGE PROMPT: Groq → FLUX-optimised descriptor prompt ── */
 async function buildImagePrompt(apiKey, model, topic) {
   try {
     const d = await geminiCall(apiKey, {
-      model, temperature: 0.7, max_tokens: 250,
+      model, temperature: 0.75, max_tokens: 200,
       messages: [
         { role: 'system', content:
-          'You are an AI image prompt engineer. Your job is to describe ONLY visual scenes — objects, environments, lighting, colors, mood, and composition. ' +
-          'NEVER mention text, words, labels, signs, banners, captions, typography, or any written content. ' +
-          'Output only the scene description in English. No explanation, no quotes.'
+          'You are a Stable Diffusion / FLUX image prompt expert. ' +
+          'Output ONLY a comma-separated list of visual descriptors in English. ' +
+          'No sentences. No explanation. No text/words/signs in the scene.'
         },
         { role: 'user', content:
-          `Create a detailed visual scene description for an image about: "${topic}"\n\n` +
-          `STRICT RULES:\n` +
-          `- Describe ONLY physical visual elements: objects, people, environment, sky, light, colors, textures\n` +
-          `- Do NOT mention any text, words, letters, signs, screens with text, labels, or banners\n` +
-          `- Style: cinematic photorealistic digital art, dramatic lighting, vibrant colors\n` +
-          `- Make it visually stunning and directly relevant to the topic\n` +
-          `- Max 60 words`
+          `Topic: "${topic}"\n\n` +
+          `Write a FLUX image prompt as comma-separated tags describing:\n` +
+          `1. Main subject (directly related to the topic — people, objects, environment)\n` +
+          `2. Setting / background\n` +
+          `3. Lighting (e.g. golden hour, neon glow, soft studio light)\n` +
+          `4. Color palette\n` +
+          `5. Mood / atmosphere\n` +
+          `6. Camera style (e.g. wide angle, close-up, aerial)\n\n` +
+          `RULES: English only. No text/words/letters/signs/screens/banners in description. Max 20 tags.`
         }
       ]
     });
     return d.choices?.[0]?.message?.content?.trim() || topic;
-  } catch(e) { return topic; } // fallback to raw topic
+  } catch(e) { return topic; }
 }
 
-/* ─── IMAGE: Pollinations.ai ──────────────────────────────── */
+/* ─── IMAGE: Pollinations.ai (FLUX) ───────────────────────── */
 async function genImage(topic, vis, apiKey, model) {
-  // Step 1: Use Gemini to build a pure visual scene prompt (no text triggers)
-  const richPrompt = await buildImagePrompt(apiKey, model, topic);
+  const descriptors = await buildImagePrompt(apiKey, model, topic);
 
-  // Step 2: Compose final prompt — NO "poster" framing (it triggers text)
-  const finalPrompt = encodeURIComponent(
-    `${richPrompt}, ` +
-    `cinematic composition, dramatic lighting, ultra HD, 8K, sharp focus, ` +
-    `vibrant colors, photorealistic, highly detailed, professional photography`
+  const positive = encodeURIComponent(
+    `${descriptors}, ` +
+    `4K, ultra sharp, high resolution, professional photography, award winning, ` +
+    `perfect composition, vivid colors, depth of field, no text, no watermark`
   );
 
-  // Step 3: Strong negative prompt to block any text rendering
   const negative = encodeURIComponent(
-    'text, words, letters, alphabet, typography, font, caption, label, sign, banner, ' +
-    'watermark, writing, handwriting, numbers, symbols, title, heading, logo text, ' +
-    'blurry, low quality, pixelated, distorted, ugly, deformed, duplicate, bad anatomy'
+    'text, words, letters, numbers, fonts, typography, captions, labels, signs, ' +
+    'banners, watermarks, logos, writing, handwriting, blurry, noisy, pixelated, ' +
+    'low quality, bad anatomy, ugly, deformed, out of frame, duplicate, disfigured'
   );
 
   const seed = Math.floor(Math.random() * 999999);
-  // 4:5 portrait ratio (ideal for Instagram, Facebook, LinkedIn)
-  const url = `https://image.pollinations.ai/prompt/${finalPrompt}?width=1024&height=1280&model=flux&seed=${seed}&nologo=true&enhance=true&negative=${negative}`;
+  const url = `https://image.pollinations.ai/prompt/${positive}` +
+    `?width=1024&height=1280&model=flux-pro&seed=${seed}&nologo=true&enhance=true&negative=${negative}`;
 
   await new Promise((resolve, reject) => {
     const img = new Image();

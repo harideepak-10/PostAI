@@ -1030,7 +1030,7 @@ async function generate() {
   toast('✦ Content ready — review and post below!');
 }
 
-/* ─── GEMINI CALL with auto-retry on 429 ──────────────────── */
+/* ─── AI CALL with auto-retry on 429 ─────────────────────── */
 async function geminiCall(apiKey, body, maxRetries = 4) {
   let delay = 8000; // start with 8s
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -1115,14 +1115,15 @@ async function genImage(topic, vis, apiKey, model) {
   return url;
 }
 
-/* ─── CAPTIONS: Gemini ────────────────────────────────────── */
+/* ─── CAPTIONS: Groq ──────────────────────────────────────── */
 async function genCaptions(apiKey, model, topic, t, platforms) {
   const platList = platforms.join(', ');
   const d = await geminiCall(apiKey, {
     model, temperature: 0.8, max_tokens: 2048,
+    response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content:
-        'You are an expert social media copywriter. Always respond with valid JSON only — no markdown, no explanation, no code fences.'
+        'You are an expert social media copywriter. Always respond with a valid JSON object only — no markdown, no explanation, no code fences, no extra text.'
       },
       { role: 'user', content:
         `Write engaging social media captions for the following topic: "${topic}"\n\n` +
@@ -1131,28 +1132,33 @@ async function genCaptions(apiKey, model, topic, t, platforms) {
         (platforms.includes('linkedin')  ? `- "linkedin": professional tone, line breaks for readability, 5-8 relevant hashtags, max 1300 chars\n` : '') +
         (platforms.includes('instagram') ? `- "instagram": fun & visual, emojis throughout the text, 15-20 hashtags at the very end, max 2000 chars\n` : '') +
         (platforms.includes('facebook')  ? `- "facebook": conversational & friendly, 3-5 hashtags, end with a question to boost engagement, max 500 chars\n` : '') +
-        `\nRespond with a single JSON object with keys: ${platList}. Values are the caption strings.`
+        `\nReturn ONLY a JSON object with keys: ${platList}. Each value is the caption string for that platform.`
       }
     ]
   });
 
   let content = d.choices?.[0]?.message?.content?.trim() || '';
-  // Strip accidental markdown fences
-  content = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  console.log('Groq raw caption response:', content);
+
+  // Strip any accidental markdown fences
+  content = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  // Extract JSON if wrapped in extra text
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (jsonMatch) content = jsonMatch[0];
 
   let parsed;
   try {
     parsed = JSON.parse(content);
   } catch(e) {
-    console.error('JSON parse failed:', content);
-    throw new Error('Caption parsing failed — unexpected AI response format');
+    console.error('JSON parse failed. Raw content:', content);
+    throw new Error('Caption parsing failed — try again');
   }
 
   // Validate at least one platform key exists
   const hasAny = platforms.some(p => parsed[p]);
   if (!hasAny) {
     console.error('No platform keys in response:', parsed);
-    throw new Error('AI did not return captions for selected platforms');
+    throw new Error('AI did not return captions for the selected platforms');
   }
 
   return parsed;

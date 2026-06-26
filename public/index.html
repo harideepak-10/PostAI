@@ -846,6 +846,30 @@
         </div>
       </div>
 
+      <!-- Image AI Provider -->
+      <div>
+        <div class="modal-section-title">Image AI</div>
+        <div class="mf">
+          <label>Provider</label>
+          <select id="kImgProvider" onchange="toggleImgProviderFields()">
+            <option value="pollinations">Pollinations — Free (no key needed)</option>
+            <option value="gemini">Google Gemini Imagen 3</option>
+            <option value="openai">OpenAI DALL-E 3</option>
+          </select>
+          <div class="mf-hint">Gemini and DALL-E produce higher quality images but require API keys.</div>
+        </div>
+        <div class="mf" id="mfGeminiKey" style="display:none;">
+          <label>Google AI Studio Key</label>
+          <input type="password" id="kGeminiKey" placeholder="AIza..."/>
+          <div class="mf-hint">Get free key at <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a></div>
+        </div>
+        <div class="mf" id="mfOpenAIImgKey" style="display:none;">
+          <label>OpenAI API Key</label>
+          <input type="password" id="kOpenAIImgKey" placeholder="sk-..."/>
+          <div class="mf-hint">Requires a paid OpenAI account. DALL-E 3 HD quality.</div>
+        </div>
+      </div>
+
       <!-- LinkedIn -->
       <div>
         <div class="modal-section-title">LinkedIn</div>
@@ -920,15 +944,31 @@ let generatedImageUrl = null;
 const GROQ_API_BASE   = 'https://api.groq.com/openai/v1';
 const DEFAULT_MODEL   = 'llama-3.3-70b-versatile';
 const DEFAULT_BACKEND = 'http://localhost:8000';
-const KEYS = { kOAI:'oai', kModel:'model', kBackend:'backend', kLI:'li', kLIUrn:'liUrn', kFB:'fb', kFBPage:'fbPage', kIG:'ig' };
+const KEYS = {
+  kOAI:'oai', kModel:'model', kBackend:'backend',
+  kImgProvider:'imgProvider', kGeminiKey:'geminiKey', kOpenAIImgKey:'openaiImgKey',
+  kLI:'li', kLIUrn:'liUrn', kFB:'fb', kFBPage:'fbPage', kIG:'ig'
+};
 
-const getKey = k => localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : k==='backend' ? DEFAULT_BACKEND : '');
+const getKey = k => localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : k==='backend' ? DEFAULT_BACKEND : k==='imgProvider' ? 'pollinations' : '');
+
+function toggleImgProviderFields() {
+  const v = document.getElementById('kImgProvider')?.value || 'pollinations';
+  document.getElementById('mfGeminiKey').style.display    = v === 'gemini'  ? '' : 'none';
+  document.getElementById('mfOpenAIImgKey').style.display = v === 'openai'  ? '' : 'none';
+}
 
 function openSettings() {
   Object.entries(KEYS).forEach(([id, k]) => {
     const el = document.getElementById(id);
-    if (el) el.value = localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : '');
+    if (el) el.value = localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : k==='backend' ? DEFAULT_BACKEND : k==='imgProvider' ? 'pollinations' : '');
   });
+  toggleImgProviderFields();
+  document.getElementById('modal').classList.add('show');
+}
+
+function openSettings_old() {
+  // replaced — kept as dead code reference
   document.getElementById('modal').classList.add('show');
 }
 function closeSettings() { document.getElementById('modal').classList.remove('show'); }
@@ -997,7 +1037,7 @@ async function generate() {
     const res = await fetch(`${backendUrl}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, platforms, groq_key: apiKey, model })
+      body: JSON.stringify({ topic, platforms, groq_key: apiKey, model, img_provider: getKey('imgProvider'), gemini_key: getKey('geminiKey'), openai_img_key: getKey('openaiImgKey') })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -1037,7 +1077,8 @@ async function generate() {
   const postAllBtn = document.getElementById('postAllBtn');
   if (postAllBtn) postAllBtn.style.display = capR.status === 'fulfilled' ? 'flex' : 'none';
   document.getElementById('postResults').innerHTML = '';
-  toast('✦ Content ready — download or post below!');
+  const providerLabel = { pollinations:'Pollinations', gemini:'Gemini Imagen 3', openai:'DALL-E 3' }[data.provider] || 'AI';
+  toast(`✦ Image by ${providerLabel} — ready!`);
 }
 
 /* ─── AI CALL with auto-retry on 429 ─────────────────────── */
@@ -1385,7 +1426,7 @@ async function regenerateImage() {
     const res = await fetch(`${backendUrl}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, platforms: [...activePlatforms], groq_key: apiKey, model })
+      body: JSON.stringify({ topic, platforms: [...activePlatforms], groq_key: apiKey, model, img_provider: getKey('imgProvider'), gemini_key: getKey('geminiKey'), openai_img_key: getKey('openaiImgKey') })
     });
     if (!res.ok) throw new Error(`Backend error ${res.status}`);
     const data = await res.json();

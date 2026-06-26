@@ -1,6 +1,6 @@
 """
-PostAI FastAPI Backend
-Orchestrates: Groq (3 parallel calls) → Pollinations image → returns to frontend
+PostAI Backend — Multi-provider image generation
+User prompt → Groq (enhance prompt + captions) → Image AI (Gemini / DALL-E / Pollinations) → frontend
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,12 +10,13 @@ import httpx
 import asyncio
 import json
 import random
+import base64
 import urllib.parse
 import os
 from pydantic import BaseModel
 from typing import List, Optional
 
-app = FastAPI(title="PostAI Backend", version="1.0.0")
+app = FastAPI(title="PostAI Backend", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,13 +30,16 @@ GROQ_API_BASE = "https://api.groq.com/openai/v1"
 DEFAULT_MODEL  = "llama-3.3-70b-versatile"
 
 
-# ── Models ─────────────────────────────────────────────────────────────────────
+# ── Request model ───────────────────────────────────────────────────────────────
 
 class GenerateRequest(BaseModel):
-    topic:     str
-    platforms: List[str]
-    groq_key:  str
-    model:     str = DEFAULT_MODEL
+    topic:         str
+    platforms:     List[str]
+    groq_key:      str
+    model:         str = DEFAULT_MODEL
+    img_provider:  str = "pollinations"   # "pollinations" | "gemini" | "openai"
+    gemini_key:    Optional[str] = None
+    openai_img_key: Optional[str] = None
 
 
 # ── Groq helper ────────────────────────────────────────────────────────────────
@@ -53,178 +57,177 @@ async def groq_call(client: httpx.AsyncClient, api_key: str, body: dict) -> dict
     return r.json()
 
 
-def parse_json_response(d: dict) -> dict:
+def parse_json(d: dict) -> dict:
     raw = d["choices"][0]["message"]["content"].strip()
     raw = raw.lstrip("```json").lstrip("```").rstrip("```").strip()
-    match = __import__("re").search(r"\{[\s\S]*\}", raw)
-    if match:
-        raw = match.group(0)
-    return json.loads(raw)
+    m = __import__("re").search(r"\{[\s\S]*\}", raw)
+    return json.loads(m.group(0) if m else raw)
 
 
-# ── Task 1: Poster content ─────────────────────────────────────────────────────
+# ── Task 1: Enhance image prompt + pick design config ─────────────────────────
 
-async def gen_poster_content(client: httpx.AsyncClient, api_key: str, model: str, topic: str) -> dict:
+async def gen_design(client: httpx.AsyncClient, api_key: str, model: str, topic: str) -> dict:
     d = await groq_call(client, api_key, {
         "model": model,
-        "temperature": 0.8,
-        "max_tokens": 500,
+        "temperature": 0.9,
+        "max_tokens": 700,
         "response_format": {"type": "json_object"},
         "messages": [
             {
                 "role": "system",
-                "content": "You are a professional marketing copywriter. Return only valid JSON with no extra text."
+                "content": (
+                    "You are a senior art director and AI image prompt engineer. "
+                    "You write world-class image prompts that generate stunning, photorealistic visuals. "
+                    "Return only valid JSON."
+                )
             },
             {
                 "role": "user",
-                "content": (
-                    f'Create marketing poster content for: "{topic}"\n\n'
-                    "Return JSON with exactly these keys:\n"
-                    '- "headline": ALL CAPS, max 5 words\n'
-                    '- "subheadline": supporting line, max 8 words\n'
-                    '- "description": 1-2 sentence description\n'
-                    '- "points": array of exactly 4 bullet points, max 5 words each\n'
-                    '- "stat": impressive metric like "500+" or "99%" or "10X"\n'
-                    '- "stat_label": label for the stat, max 4 words\n'
-                    '- "cta": call-to-action button text, max 5 words'
-                )
+                "content": f"""Create the design configuration for a premium social media marketing poster about: "{topic}"
+
+Return JSON with exactly these keys:
+- "template": one of "saas" | "cyber-ai" | "corporate" | "minimal" | "glassmorphism"
+- "primary_color": hex color matching the topic (e.g. "#7c3aed")
+- "secondary_color": complementary accent hex
+- "layout": one of "left-text" | "right-text" | "bottom-text" | "center-overlay"
+- "headline": ALL CAPS, max 5 words
+- "subheadline": supporting line, max 8 words
+- "description": 1-2 sentence description
+- "points": array of exactly 4 bullet points, max 5 words each
+- "stat": impressive metric like "500+" or "99%"
+- "stat_label": label for the stat, max 4 words
+- "cta": call-to-action, max 5 words
+- "image_prompt": A vivid, detailed paragraph describing a PHOTOREALISTIC 3D RENDERED SCENE for this topic.
+  Describe exactly: the main subject (specific object/person/device), the environment, lighting (neon rim lights, volumetric fog, lens flares), materials (glowing glass, brushed metal), camera angle, mood.
+  Style: cinematic CGI, 8K, octane render, Apple advertisement quality.
+  Under 120 words. No mentions of text, letters, or UI buttons."""
             }
         ]
     })
     try:
-        return parse_json_response(d)
+        return parse_json(d)
     except Exception:
         return {
-            "headline": topic.upper()[:30],
+            "template": "cyber-ai", "primary_color": "#7c3aed", "secondary_color": "#22d3ee",
+            "layout": "bottom-text", "headline": topic.upper()[:30],
             "subheadline": "Professional. Powerful. Proven.",
-            "description": f"Discover the best in {topic}.",
-            "points": ["Top Quality Results", "Expert Team", "Fast Delivery", "Best Value"],
-            "stat": "100%",
-            "stat_label": "Client Satisfaction",
-            "cta": "Get Started Today"
+            "description": f"Discover the future of {topic}.",
+            "points": ["Top Quality", "Expert Team", "Fast Delivery", "Best Value"],
+            "stat": "100%", "stat_label": "Client Satisfaction", "cta": "Get Started Today",
+            "image_prompt": (
+                f"Cinematic 3D render of {topic}. Glowing AI hologram floats in a dark futuristic studio, "
+                "blue and purple neon rim lighting, volumetric light rays, glassmorphism panels, "
+                "floating digital particles, deep space dark background, ultra-realistic, 8K, octane render."
+            )
         }
 
 
 # ── Task 2: Social media captions ──────────────────────────────────────────────
 
 async def gen_captions(client: httpx.AsyncClient, api_key: str, model: str, topic: str, platforms: List[str]) -> dict:
-    plat_str = ", ".join(platforms)
+    plat_str   = ", ".join(platforms)
     plat_rules = ""
-    if "linkedin"  in platforms: plat_rules += '- "linkedin": professional tone, 5-8 hashtags, max 1300 chars\n'
-    if "instagram" in platforms: plat_rules += '- "instagram": fun & visual, emojis throughout, 15-20 hashtags, max 2000 chars\n'
-    if "facebook"  in platforms: plat_rules += '- "facebook": conversational, 3-5 hashtags, end with a question, max 500 chars\n'
+    if "linkedin"  in platforms: plat_rules += '- "linkedin": professional, 5-8 hashtags, max 1300 chars\n'
+    if "instagram" in platforms: plat_rules += '- "instagram": fun & visual, emojis, 15-20 hashtags, max 2000 chars\n'
+    if "facebook"  in platforms: plat_rules += '- "facebook": conversational, 3-5 hashtags, end with question, max 500 chars\n'
 
     d = await groq_call(client, api_key, {
-        "model": model,
-        "temperature": 0.8,
-        "max_tokens": 2000,
+        "model": model, "temperature": 0.8, "max_tokens": 2000,
         "response_format": {"type": "json_object"},
         "messages": [
-            {
-                "role": "system",
-                "content": "You are a social media copywriter. Return only valid JSON with platform captions."
-            },
-            {
-                "role": "user",
-                "content": (
-                    f'Write social media captions for: "{topic}"\n\n'
-                    f"Platforms: {plat_str}\n\n"
-                    "Requirements:\n"
-                    f"{plat_rules}"
-                    f"\nReturn JSON with keys: {plat_str}"
-                )
-            }
+            {"role": "system", "content": "Expert social media copywriter. Return only valid JSON."},
+            {"role": "user", "content": f'Write captions for: "{topic}"\nPlatforms: {plat_str}\n{plat_rules}\nReturn JSON with keys: {plat_str}'}
         ]
     })
     try:
-        return parse_json_response(d)
+        return parse_json(d)
     except Exception:
-        return {p: f"Check out our latest on {topic}! #marketing" for p in platforms}
+        return {p: f"Exciting update about {topic}! #marketing #{topic.replace(' ','')}" for p in platforms}
 
 
-# ── Task 3: Design configuration + image prompt ────────────────────────────────
+# ── Image generation — Gemini Imagen 3 ─────────────────────────────────────────
 
-DESIGN_SYSTEM_PROMPT = """You are a senior art director at a world-class design agency.
-You write image prompts that produce stunning, photorealistic 3D advertisement visuals.
-Your prompts are concrete, specific, and describe exact visual scenes — not concepts.
-Return only valid JSON."""
-
-DESIGN_USER_PROMPT = """Design the visual configuration for a premium social media marketing poster about: "{topic}"
-
-Return JSON with exactly these keys:
-- "template": one of "saas" | "cyber-ai" | "corporate" | "minimal" | "glassmorphism"
-- "primary_color": hex color that fits the topic (e.g. "#7c3aed")
-- "secondary_color": complementary accent hex color
-- "layout": one of "left-text" | "right-text" | "bottom-text" | "center-overlay"
-- "image_prompt": Write a single detailed paragraph (not tags) describing a photorealistic 3D rendered scene for "{topic}".
-
-  The scene must be VISUALLY SPECIFIC — describe exactly what is in the image:
-  - The main subject (a specific object, person, device, or scene element directly related to {topic})
-  - The environment and atmosphere (dark studio, futuristic room, abstract space, etc.)
-  - Lighting details (neon blue rim light from left, purple volumetric fog, lens flare at top right)
-  - Materials and textures (brushed metal, glowing glass, holographic surfaces)
-  - Mood and style (cinematic, luxury advertisement, Apple product reveal style)
-  - Camera angle (wide angle, eye-level, slight upward tilt)
-
-  Keep it under 120 words. Write as a vivid scene description. Do NOT mention text, letters, watermarks, or logos."""
-
-
-async def gen_design_config(client: httpx.AsyncClient, api_key: str, model: str, topic: str) -> dict:
-    d = await groq_call(client, api_key, {
-        "model": model,
-        "temperature": 0.9,
-        "max_tokens": 800,
-        "response_format": {"type": "json_object"},
-        "messages": [
-            {"role": "system", "content": DESIGN_SYSTEM_PROMPT},
-            {"role": "user",   "content": DESIGN_USER_PROMPT.format(topic=topic)},
-        ]
-    })
-    try:
-        return parse_json_response(d)
-    except Exception:
-        return {
-            "template": "cyber-ai",
-            "primary_color": "#7c3aed",
-            "secondary_color": "#22d3ee",
-            "layout": "bottom-text",
-            "image_prompt": (
-                f"A cinematic 3D rendered scene for {topic}. A glowing AI hologram floats in a dark futuristic room, "
-                "surrounded by blue and purple neon light rays. Holographic data streams flow around a sleek laptop "
-                "displaying a glowing dashboard interface. The background features deep space-like darkness with "
-                "scattered light particles and volumetric fog. Cinematic lighting with rim lights, lens flares, "
-                "and dramatic shadows. Ultra-realistic, 8K, octane render quality, Apple advertisement style."
-            )
+async def gen_image_gemini(prompt: str, api_key: str) -> str:
+    """Google Gemini Imagen 3 — returns data:image/png;base64,..."""
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"imagen-3.0-generate-001:predict?key={api_key}"
+    )
+    payload = {
+        "instances": [{"prompt": prompt}],
+        "parameters": {
+            "sampleCount": 1,
+            "aspectRatio": "4:5",
+            "safetyFilterLevel": "block_few",
+            "personGeneration": "allow_adult"
         }
+    }
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        r = await client.post(url, json=payload)
+        if r.status_code != 200:
+            raise HTTPException(status_code=r.status_code, detail=f"Gemini error: {r.text[:200]}")
+        data = r.json()
+        b64  = data["predictions"][0]["bytesBase64Encoded"]
+        return f"data:image/png;base64,{b64}"
 
 
-# ── Image generation — tries gptimage (DALL-E 3), falls back to flux-pro ────────
+# ── Image generation — OpenAI DALL-E 3 ─────────────────────────────────────────
 
-async def gen_background_image(image_prompt: str, seed: Optional[int] = None) -> str:
-    seed = seed or random.randint(0, 999999)
+async def gen_image_openai(prompt: str, api_key: str) -> str:
+    """OpenAI DALL-E 3 HD — returns image URL"""
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        r = await client.post(
+            "https://api.openai.com/v1/images/generations",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": "dall-e-3",
+                "prompt": prompt + ". No text, no letters, no watermarks.",
+                "n": 1,
+                "size": "1024x1792",
+                "quality": "hd",
+                "style": "vivid"
+            }
+        )
+        if r.status_code != 200:
+            raise HTTPException(status_code=r.status_code, detail=f"OpenAI error: {r.text[:200]}")
+        return r.json()["data"][0]["url"]
 
-    # Clean, focused prompt — no contradictory "leave space" instructions
-    full_prompt = (
-        f"{image_prompt} "
-        "Photorealistic, ultra high quality, 8K resolution, cinematic color grading, "
-        "professional advertisement photography. No text, no letters, no watermarks, no logos."
+
+# ── Image generation — Pollinations (free, no key) ─────────────────────────────
+
+async def gen_image_pollinations(prompt: str) -> str:
+    """Pollinations gptimage (DALL-E 3 quality) — returns URL"""
+    full = (
+        f"{prompt}. "
+        "Photorealistic, ultra high quality, 8K, cinematic lighting. "
+        "No text, no letters, no watermarks, no logos."
+    )
+    neg = "text, letters, watermark, logo, blurry, low quality, ugly, deformed, nsfw"
+    enc = urllib.parse.quote(full)
+    neg_enc = urllib.parse.quote(neg)
+    seed = random.randint(0, 999999)
+    return (
+        f"https://image.pollinations.ai/prompt/{enc}"
+        f"?width=1024&height=1280&model=gptimage&nologo=true&nofeed=true&seed={seed}"
     )
 
-    negative = (
-        "text, letters, words, watermark, logo, signature, blurry, low quality, "
-        "ugly, deformed, pixelated, cartoon, clipart, flat, dull, overexposed, nsfw"
-    )
 
-    prompt_enc = urllib.parse.quote(full_prompt)
-    neg_enc    = urllib.parse.quote(negative)
+# ── Route image gen to the right provider ──────────────────────────────────────
 
-    # gptimage = DALL-E 3 quality via Pollinations — best prompt adherence
-    # Returns both URLs; frontend tries gptimage first, falls back to flux-pro
-    gptimage_url = (
-        f"https://image.pollinations.ai/prompt/{prompt_enc}"
-        f"?width=1024&height=1280&model=gptimage&nologo=true&nofeed=true"
-    )
-    return gptimage_url
+async def generate_image(prompt: str, provider: str, gemini_key: str = None, openai_key: str = None) -> str:
+    if provider == "gemini" and gemini_key:
+        try:
+            return await gen_image_gemini(prompt, gemini_key)
+        except Exception as e:
+            print(f"Gemini failed ({e}), falling back to Pollinations")
+
+    if provider == "openai" and openai_key:
+        try:
+            return await gen_image_openai(prompt, openai_key)
+        except Exception as e:
+            print(f"OpenAI failed ({e}), falling back to Pollinations")
+
+    return await gen_image_pollinations(prompt)
 
 
 # ── Main endpoint ───────────────────────────────────────────────────────────────
@@ -237,30 +240,48 @@ async def generate(req: GenerateRequest):
         raise HTTPException(status_code=400, detail="Topic cannot be empty")
 
     async with httpx.AsyncClient() as client:
-        # 3 Groq calls in parallel
-        content, captions, design = await asyncio.gather(
-            gen_poster_content(client, req.groq_key, req.model, req.topic),
+        # Groq: design config + captions in parallel
+        design, captions = await asyncio.gather(
+            gen_design(client, req.groq_key, req.model, req.topic),
             gen_captions(client, req.groq_key, req.model, req.topic, req.platforms),
-            gen_design_config(client, req.groq_key, req.model, req.topic),
         )
 
-    # Image generation (after Groq, no rate limit concern)
-    image_url = await gen_background_image(design.get("image_prompt", req.topic))
+    # Image generation with selected provider
+    image_url = await generate_image(
+        prompt       = design.get("image_prompt", req.topic),
+        provider     = req.img_provider,
+        gemini_key   = req.gemini_key,
+        openai_key   = req.openai_img_key,
+    )
 
     return {
-        "poster_content": content,
-        "captions":       captions,
-        "design_config":  design,
-        "image_url":      image_url,
+        "poster_content": {
+            "headline":    design.get("headline", ""),
+            "subheadline": design.get("subheadline", ""),
+            "description": design.get("description", ""),
+            "points":      design.get("points", []),
+            "stat":        design.get("stat", ""),
+            "stat_label":  design.get("stat_label", ""),
+            "cta":         design.get("cta", "Get Started"),
+        },
+        "design_config": {
+            "template":        design.get("template", "saas"),
+            "primary_color":   design.get("primary_color", "#7c3aed"),
+            "secondary_color": design.get("secondary_color", "#22d3ee"),
+            "layout":          design.get("layout", "bottom-text"),
+        },
+        "captions":  captions,
+        "image_url": image_url,
+        "provider":  req.img_provider,
     }
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "PostAI Backend"}
+    return {"status": "ok", "service": "PostAI Backend v2"}
 
 
-# ── Serve frontend static files ─────────────────────────────────────────────────
+# ── Serve frontend ──────────────────────────────────────────────────────────────
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "public")
 
@@ -268,7 +289,6 @@ FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "public")
 async def serve_index():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
-# Mount any other static assets (css, images, etc.) if present
 if os.path.isdir(FRONTEND_DIR):
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 

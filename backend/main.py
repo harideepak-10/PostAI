@@ -144,42 +144,36 @@ async def gen_captions(client: httpx.AsyncClient, api_key: str, model: str, topi
 
 # ── Task 3: Design configuration + image prompt ────────────────────────────────
 
-DESIGN_SYSTEM_PROMPT = """You are a senior art director and AI image prompt engineer at a top-tier design agency.
-Your image prompts produce COMPLETE, VISUALLY RICH marketing poster artwork — not simple backgrounds.
-Every prompt you write results in a premium, agency-quality visual suitable for a Fortune 500 campaign.
+DESIGN_SYSTEM_PROMPT = """You are a senior art director at a world-class design agency.
+You write image prompts that produce stunning, photorealistic 3D advertisement visuals.
+Your prompts are concrete, specific, and describe exact visual scenes — not concepts.
 Return only valid JSON."""
 
-DESIGN_USER_PROMPT = """Design the complete visual configuration for a professional social media marketing poster about: "{topic}"
+DESIGN_USER_PROMPT = """Design the visual configuration for a premium social media marketing poster about: "{topic}"
 
 Return JSON with exactly these keys:
-- "template": one of "saas" | "cyber-ai" | "corporate" | "minimal" | "glassmorphism" — pick the most fitting for this topic
-- "primary_color": hex color matching the topic theme
+- "template": one of "saas" | "cyber-ai" | "corporate" | "minimal" | "glassmorphism"
+- "primary_color": hex color that fits the topic (e.g. "#7c3aed")
 - "secondary_color": complementary accent hex color
 - "layout": one of "left-text" | "right-text" | "bottom-text" | "center-overlay"
-- "image_style": one of "hologram" | "mockup" | "abstract-tech" | "business-illustration" | "product-scene"
-- "image_prompt": A COMPLETE, DETAILED image generation prompt. Follow this exact framework:
+- "image_prompt": Write a single detailed paragraph (not tags) describing a photorealistic 3D rendered scene for "{topic}".
 
-  You are a professional graphic designer. Convert the topic into a complete marketing poster visual.
-  Generate a premium futuristic advertisement visual — NOT a simple background or abstract pattern.
+  The scene must be VISUALLY SPECIFIC — describe exactly what is in the image:
+  - The main subject (a specific object, person, device, or scene element directly related to {topic})
+  - The environment and atmosphere (dark studio, futuristic room, abstract space, etc.)
+  - Lighting details (neon blue rim light from left, purple volumetric fog, lens flare at top right)
+  - Materials and textures (brushed metal, glowing glass, holographic surfaces)
+  - Mood and style (cinematic, luxury advertisement, Apple product reveal style)
+  - Camera angle (wide angle, eye-level, slight upward tilt)
 
-  The image MUST include ALL of these elements relevant to "{topic}":
-  SUBJECTS: Specific, realistic subjects (3D AI hologram, floating laptop with glowing dashboard, mobile screens, product mockups, professional person, or industry-specific hero element)
-  ATMOSPHERE: Dark luxury background with neon gradients, glassmorphism panels, glowing UI elements, floating particles, depth of field
-  LIGHTING: Cinematic volumetric lighting, neon rim lights, dramatic shadows, lens flares, god rays, realistic reflections
-  COMPOSITION: Strong visual hierarchy — hero subject occupies 60-70% of the image, leaving deliberate dark space on one side for text overlay. Magazine-quality composition.
-  STYLE: Photorealistic 3D render, 8K resolution, ultra-detailed, professional CGI, premium branding aesthetic, social media advertisement quality
-  QUALITY MARKERS: Hyperrealistic, octane render, unreal engine 5 quality, cinematic color grading, studio lighting setup
-
-  STRICTLY FORBIDDEN: text, words, letters, watermarks, logos, UI buttons, navigation bars, typed content
-
-  Output the prompt as comma-separated descriptive tags, 100-150 words. Make it extremely specific to "{topic}"."""
+  Keep it under 120 words. Write as a vivid scene description. Do NOT mention text, letters, watermarks, or logos."""
 
 
 async def gen_design_config(client: httpx.AsyncClient, api_key: str, model: str, topic: str) -> dict:
     d = await groq_call(client, api_key, {
         "model": model,
         "temperature": 0.9,
-        "max_tokens": 900,
+        "max_tokens": 800,
         "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": DESIGN_SYSTEM_PROMPT},
@@ -190,46 +184,47 @@ async def gen_design_config(client: httpx.AsyncClient, api_key: str, model: str,
         return parse_json_response(d)
     except Exception:
         return {
-            "template": "saas",
+            "template": "cyber-ai",
             "primary_color": "#7c3aed",
             "secondary_color": "#22d3ee",
             "layout": "bottom-text",
-            "image_style": "abstract-tech",
             "image_prompt": (
-                f"premium futuristic technology advertisement visual, {topic}, realistic 3D AI hologram, "
-                "laptop displaying modern dashboard, glowing digital network connections, dark luxury background, "
-                "blue and purple neon gradients, glassmorphism panels, cinematic volumetric lighting, "
-                "floating particles, holographic effects, depth of field, ultra detailed, 8K, photorealistic, "
-                "no text, no watermark, no logo"
+                f"A cinematic 3D rendered scene for {topic}. A glowing AI hologram floats in a dark futuristic room, "
+                "surrounded by blue and purple neon light rays. Holographic data streams flow around a sleek laptop "
+                "displaying a glowing dashboard interface. The background features deep space-like darkness with "
+                "scattered light particles and volumetric fog. Cinematic lighting with rim lights, lens flares, "
+                "and dramatic shadows. Ultra-realistic, 8K, octane render quality, Apple advertisement style."
             )
         }
 
 
-# ── Image generation (Pollinations FLUX) ───────────────────────────────────────
+# ── Image generation — tries gptimage (DALL-E 3), falls back to flux-pro ────────
 
 async def gen_background_image(image_prompt: str, seed: Optional[int] = None) -> str:
     seed = seed or random.randint(0, 999999)
+
+    # Clean, focused prompt — no contradictory "leave space" instructions
     full_prompt = (
-        f"{image_prompt}, "
-        "complete premium marketing poster visual, professional CGI, photorealistic 3D render, "
-        "cinematic lighting, ultra detailed, 8K resolution, high quality, "
-        "no text, no words, no letters, no watermark, no logo, no signature"
+        f"{image_prompt} "
+        "Photorealistic, ultra high quality, 8K resolution, cinematic color grading, "
+        "professional advertisement photography. No text, no letters, no watermarks, no logos."
     )
+
     negative = (
-        "text, words, letters, alphabet, typography, watermark, logo, signature, url, website, "
-        "copyright symbol, blurry, low quality, ugly, deformed, distorted, noisy, pixelated, "
-        "simple background, abstract shapes only, empty design, stock photo, clipart, cartoon, nsfw"
+        "text, letters, words, watermark, logo, signature, blurry, low quality, "
+        "ugly, deformed, pixelated, cartoon, clipart, flat, dull, overexposed, nsfw"
     )
 
     prompt_enc = urllib.parse.quote(full_prompt)
     neg_enc    = urllib.parse.quote(negative)
 
-    url = (
+    # gptimage = DALL-E 3 quality via Pollinations — best prompt adherence
+    # Returns both URLs; frontend tries gptimage first, falls back to flux-pro
+    gptimage_url = (
         f"https://image.pollinations.ai/prompt/{prompt_enc}"
-        f"?width=1024&height=1280&model=flux-pro&seed={seed}"
-        f"&nologo=true&nofeed=true&negative={neg_enc}"
+        f"?width=1024&height=1280&model=gptimage&nologo=true&nofeed=true"
     )
-    return url
+    return gptimage_url
 
 
 # ── Main endpoint ───────────────────────────────────────────────────────────────

@@ -1091,17 +1091,20 @@ function renderPosterHTML(c, design, bgUrl) {
   const cta         = clean(c?.cta         || 'Get Started');
   const icons       = ['🎯','⚡','💡','🚀'];
 
-  /* background image */
+  /* background image — with fallback from gptimage to flux-pro if load fails */
+  const fluxFallback = bgUrl ? bgUrl.replace('model=gptimage','model=flux-pro') + `&negative=${encodeURIComponent('text,watermark,logo,blurry,low quality')}` : '';
   const bgEl = bgUrl
-    ? `<img src="${bgUrl}" crossorigin="anonymous" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;">`
+    ? `<img src="${bgUrl}" crossorigin="anonymous"
+         style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;"
+         onerror="if(this.src!=='${fluxFallback}')this.src='${fluxFallback}'">`
     : `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#030b1a,#0d0520);z-index:0;"></div>`;
 
-  /* overlay gradient — darkens the text side */
+  /* overlay gradient — heavily darkens the text zone, lets image show on the visual side */
   const ov = {
-    'left-text':      `linear-gradient(90deg,rgba(4,6,18,.97) 0%,rgba(4,6,18,.93) 44%,rgba(4,6,18,.3) 68%,transparent 100%)`,
-    'right-text':     `linear-gradient(270deg,rgba(4,6,18,.97) 0%,rgba(4,6,18,.93) 44%,rgba(4,6,18,.3) 68%,transparent 100%)`,
-    'bottom-text':    `linear-gradient(to top,rgba(4,6,18,.99) 0%,rgba(4,6,18,.96) 40%,rgba(4,6,18,.55) 62%,transparent 100%)`,
-    'center-overlay': `linear-gradient(170deg,rgba(4,6,18,.82),rgba(10,4,32,.72),rgba(4,6,18,.88))`,
+    'left-text':      `linear-gradient(90deg,rgba(4,6,18,1) 0%,rgba(4,6,18,.98) 38%,rgba(4,6,18,.7) 56%,rgba(4,6,18,.2) 75%,transparent 100%)`,
+    'right-text':     `linear-gradient(270deg,rgba(4,6,18,1) 0%,rgba(4,6,18,.98) 38%,rgba(4,6,18,.7) 56%,rgba(4,6,18,.2) 75%,transparent 100%)`,
+    'bottom-text':    `linear-gradient(to top,rgba(4,6,18,1) 0%,rgba(4,6,18,1) 30%,rgba(4,6,18,.92) 48%,rgba(4,6,18,.5) 65%,rgba(4,6,18,.1) 82%,transparent 100%)`,
+    'center-overlay': `linear-gradient(170deg,rgba(4,6,18,.88),rgba(10,4,32,.80),rgba(4,6,18,.88))`,
   };
   const overlay = ov[layout] || ov['bottom-text'];
 

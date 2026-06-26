@@ -987,7 +987,7 @@ async function generate() {
     </div>`).join('');
 
   const [imgR, capR] = await Promise.allSettled([
-    genImage(topic, DEFAULT_STYLE),
+    genImage(topic, DEFAULT_STYLE, apiKey, model),
     genCaptions(apiKey, model, topic, DEFAULT_TONE, platforms)
   ]);
 
@@ -1030,13 +1030,57 @@ async function generate() {
   toast('✦ Content ready — review and post below!');
 }
 
+/* ─── IMAGE PROMPT: Groq → detailed visual prompt ─────────── */
+async function buildImagePrompt(apiKey, model, topic) {
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model, temperature: 0.7, max_tokens: 300,
+        messages: [
+          { role: 'system', content:
+            'You are an expert AI image prompt engineer. Write prompts in English only. Output only the image prompt — no explanation, no quotes, no extra text.'
+          },
+          { role: 'user', content:
+            `Write a highly detailed, vivid image generation prompt for a professional social media poster about: "${topic}"\n\n` +
+            `Rules:\n` +
+            `- English only, no other languages\n` +
+            `- Describe the scene, colors, lighting, mood, composition clearly\n` +
+            `- Photorealistic or high-quality digital art style\n` +
+            `- NO text, NO words, NO letters in the image\n` +
+            `- Cinematic, vibrant, HD quality\n` +
+            `- Max 80 words`
+          }
+        ]
+      })
+    });
+    const d = await r.json();
+    if (r.ok) return d.choices?.[0]?.message?.content?.trim() || topic;
+  } catch(e) { /* fallback below */ }
+  return topic;
+}
+
 /* ─── IMAGE: Pollinations.ai ──────────────────────────────── */
-async function genImage(topic, vis) {
-  const prompt = encodeURIComponent(
-    `Professional eye-catching social media poster for: "${topic}". Style: ${vis}. No text overlays. Highly detailed, vibrant, cinematic quality.`
+async function genImage(topic, vis, apiKey, model) {
+  // Step 1: Use Groq to build a rich, accurate image prompt
+  const richPrompt = await buildImagePrompt(apiKey, model, topic);
+
+  // Step 2: Compose final prompt with quality boosters
+  const finalPrompt = encodeURIComponent(
+    `${richPrompt}, professional social media poster composition, ` +
+    `no text, no words, no letters, English style, ultra HD, 8K resolution, ` +
+    `sharp focus, perfect lighting, vibrant colors, high contrast, photorealistic, masterpiece`
   );
+
+  const negative = encodeURIComponent(
+    'text, words, letters, watermark, blurry, low quality, pixelated, distorted, ugly, bad anatomy, duplicate'
+  );
+
   const seed = Math.floor(Math.random() * 999999);
-  const url = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=1024&seed=${seed}&nologo=true&enhance=true`;
+  // Use flux-pro for best quality
+  const url = `https://image.pollinations.ai/prompt/${finalPrompt}?width=1024&height=1024&model=flux-pro&seed=${seed}&nologo=true&enhance=true&negative=${negative}`;
+
   await new Promise((resolve, reject) => {
     const img = new Image();
     img.onload  = resolve;
@@ -1145,7 +1189,8 @@ async function regenerateImage() {
   sk.style.cssText = 'display:block;width:100%;height:100%;';
   generatedImageUrl = null;
   try {
-    generatedImageUrl = await genImage(topic, DEFAULT_STYLE);
+    const apiKey = getKey('oai'), model = getKey('model') || DEFAULT_MODEL;
+    generatedImageUrl = await genImage(topic, DEFAULT_STYLE, apiKey, model);
     sk.style.display = 'none';
     const ni = document.createElement('img');
     ni.src = generatedImageUrl; ni.alt = 'Poster';

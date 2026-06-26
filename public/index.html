@@ -1030,35 +1030,57 @@ async function generate() {
   toast('✦ Content ready — review and post below!');
 }
 
-/* ─── IMAGE PROMPT: Gemini → detailed visual prompt ───────── */
-async function buildImagePrompt(apiKey, model, topic) {
-  try {
+/* ─── GEMINI CALL with auto-retry on 429 ──────────────────── */
+async function geminiCall(apiKey, body, maxRetries = 4) {
+  let delay = 8000; // start with 8s
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const r = await fetch(`${GEMINI_API_BASE}/chat/completions`, {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model, temperature: 0.7, max_tokens: 300,
-        messages: [
-          { role: 'system', content:
-            'You are an expert AI image prompt engineer. Write prompts in English only. Output only the image prompt — no explanation, no quotes, no extra text.'
-          },
-          { role: 'user', content:
-            `Write a highly detailed, vivid image generation prompt for a professional social media poster about: "${topic}"\n\n` +
-            `Rules:\n` +
-            `- English only, no other languages\n` +
-            `- Describe the scene, colors, lighting, mood, composition clearly\n` +
-            `- Photorealistic or high-quality digital art style\n` +
-            `- NO text, NO words, NO letters in the image\n` +
-            `- Cinematic, vibrant, HD quality\n` +
-            `- Max 80 words`
-          }
-        ]
-      })
+      body: JSON.stringify(body)
     });
     const d = await r.json();
-    if (r.ok) return d.choices?.[0]?.message?.content?.trim() || topic;
-  } catch(e) { /* fallback below */ }
-  return topic;
+    if (r.ok) return d;
+    if (r.status === 429 && attempt < maxRetries) {
+      // Respect retryDelay from Gemini if provided, otherwise use exponential backoff
+      const retryAfterMs = d.error?.details?.find(x => x.retryDelay)?.retryDelay
+        ? parseInt(d.error.details.find(x => x.retryDelay).retryDelay) * 1000
+        : delay;
+      console.warn(`Gemini 429 — retrying in ${retryAfterMs/1000}s (attempt ${attempt+1}/${maxRetries})`);
+      toast(`⏳ Rate limit hit — retrying in ${Math.round(retryAfterMs/1000)}s...`);
+      await new Promise(res => setTimeout(res, retryAfterMs));
+      delay = Math.min(delay * 2, 60000); // max 60s backoff
+      continue;
+    }
+    const msg = d.error?.message || `Gemini error ${r.status}`;
+    console.error('Gemini error:', d);
+    throw new Error(msg);
+  }
+}
+
+/* ─── IMAGE PROMPT: Gemini → detailed visual prompt ───────── */
+async function buildImagePrompt(apiKey, model, topic) {
+  try {
+    const d = await geminiCall(apiKey, {
+      model, temperature: 0.7, max_tokens: 300,
+      messages: [
+        { role: 'system', content:
+          'You are an expert AI image prompt engineer. Write prompts in English only. Output only the image prompt — no explanation, no quotes, no extra text.'
+        },
+        { role: 'user', content:
+          `Write a highly detailed, vivid image generation prompt for a professional social media poster about: "${topic}"\n\n` +
+          `Rules:\n` +
+          `- English only, no other languages\n` +
+          `- Describe the scene, colors, lighting, mood, composition clearly\n` +
+          `- Photorealistic or high-quality digital art style\n` +
+          `- NO text, NO words, NO letters in the image\n` +
+          `- Cinematic, vibrant, HD quality\n` +
+          `- Max 80 words`
+        }
+      ]
+    });
+    return d.choices?.[0]?.message?.content?.trim() || topic;
+  } catch(e) { return topic; } // fallback to raw topic
 }
 
 /* ─── IMAGE: Pollinations.ai ──────────────────────────────── */
@@ -1093,34 +1115,23 @@ async function genImage(topic, vis, apiKey, model) {
 /* ─── CAPTIONS: Gemini ────────────────────────────────────── */
 async function genCaptions(apiKey, model, topic, t, platforms) {
   const platList = platforms.join(', ');
-  const r = await fetch(`${GEMINI_API_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model, temperature: 0.8, max_tokens: 2048,
-      messages: [
-        { role: 'system', content:
-          'You are an expert social media copywriter. Always respond with valid JSON only — no markdown, no explanation, no code fences.'
-        },
-        { role: 'user', content:
-          `Write engaging social media captions for the following topic: "${topic}"\n\n` +
-          `Create captions ONLY for these platforms: ${platList}\n\n` +
-          `Requirements:\n` +
-          (platforms.includes('linkedin')  ? `- "linkedin": professional tone, line breaks for readability, 5-8 relevant hashtags, max 1300 chars\n` : '') +
-          (platforms.includes('instagram') ? `- "instagram": fun & visual, emojis throughout the text, 15-20 hashtags at the very end, max 2000 chars\n` : '') +
-          (platforms.includes('facebook')  ? `- "facebook": conversational & friendly, 3-5 hashtags, end with a question to boost engagement, max 500 chars\n` : '') +
-          `\nRespond with a single JSON object with keys: ${platList}. Values are the caption strings.`
-        }
-      ]
-    })
+  const d = await geminiCall(apiKey, {
+    model, temperature: 0.8, max_tokens: 2048,
+    messages: [
+      { role: 'system', content:
+        'You are an expert social media copywriter. Always respond with valid JSON only — no markdown, no explanation, no code fences.'
+      },
+      { role: 'user', content:
+        `Write engaging social media captions for the following topic: "${topic}"\n\n` +
+        `Create captions ONLY for these platforms: ${platList}\n\n` +
+        `Requirements:\n` +
+        (platforms.includes('linkedin')  ? `- "linkedin": professional tone, line breaks for readability, 5-8 relevant hashtags, max 1300 chars\n` : '') +
+        (platforms.includes('instagram') ? `- "instagram": fun & visual, emojis throughout the text, 15-20 hashtags at the very end, max 2000 chars\n` : '') +
+        (platforms.includes('facebook')  ? `- "facebook": conversational & friendly, 3-5 hashtags, end with a question to boost engagement, max 500 chars\n` : '') +
+        `\nRespond with a single JSON object with keys: ${platList}. Values are the caption strings.`
+      }
+    ]
   });
-
-  const d = await r.json();
-  if (!r.ok) {
-    const msg = d.error?.message || `Gemini error ${r.status}`;
-    console.error('Gemini error:', d);
-    throw new Error(msg);
-  }
 
   let content = d.choices?.[0]?.message?.content?.trim() || '';
   // Strip accidental markdown fences

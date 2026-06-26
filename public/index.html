@@ -839,6 +839,11 @@
             <option value="gemma2-9b-it">Gemma 2 9B</option>
           </select>
         </div>
+        <div class="mf">
+          <label>Backend URL</label>
+          <input type="text" id="kBackend" placeholder="http://localhost:8000"/>
+          <div class="mf-hint">Run <code>uvicorn main:app --reload</code> in the <code>backend/</code> folder.</div>
+        </div>
       </div>
 
       <!-- LinkedIn -->
@@ -912,11 +917,12 @@ let activePlatforms = new Set(['linkedin','instagram','facebook']);
 let generatedImageUrl = null;
 
 /* ─── SETTINGS ────────────────────────────────────────────── */
-const GROQ_API_BASE  = 'https://api.groq.com/openai/v1';
-const DEFAULT_MODEL  = 'llama-3.3-70b-versatile';
-const KEYS = { kOAI:'oai', kModel:'model', kLI:'li', kLIUrn:'liUrn', kFB:'fb', kFBPage:'fbPage', kIG:'ig' };
+const GROQ_API_BASE   = 'https://api.groq.com/openai/v1';
+const DEFAULT_MODEL   = 'llama-3.3-70b-versatile';
+const DEFAULT_BACKEND = 'http://localhost:8000';
+const KEYS = { kOAI:'oai', kModel:'model', kBackend:'backend', kLI:'li', kLIUrn:'liUrn', kFB:'fb', kFBPage:'fbPage', kIG:'ig' };
 
-const getKey = k => localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : '');
+const getKey = k => localStorage.getItem('pk_'+k) || (k==='model' ? DEFAULT_MODEL : k==='backend' ? DEFAULT_BACKEND : '');
 
 function openSettings() {
   Object.entries(KEYS).forEach(([id, k]) => {
@@ -966,8 +972,9 @@ async function generate() {
 
   const apiKey = getKey('oai');
   if (!apiKey) { toast('⚙️ Add your Groq API key in Settings first!'); openSettings(); return; }
-  const model  = getKey('model') || DEFAULT_MODEL;
-  const platforms = [...activePlatforms];
+  const model       = getKey('model') || DEFAULT_MODEL;
+  const backendUrl  = getKey('backend') || DEFAULT_BACKEND;
+  const platforms   = [...activePlatforms];
   const btn = document.getElementById('genBtn');
   btn.disabled = true;
   document.getElementById('genTxt').innerHTML = '<div class="spin"></div>&nbsp;Generating...';
@@ -985,40 +992,44 @@ async function generate() {
       <div class="cap-body"><div class="skeleton cap-sk"></div></div>
     </div>`).join('');
 
-  // Run 2 parallel Groq calls: full poster design spec + captions
-  const [designR, capR] = await Promise.allSettled([
-    genPosterDesign(apiKey, model, topic),
-    genCaptions(apiKey, model, topic, DEFAULT_TONE, platforms)
-  ]);
-
-  // Use Groq's generated image_prompt to create the FLUX background
-  let bgUrl = '';
-  if (designR.status === 'fulfilled') {
-    try { bgUrl = await genBgImage(topic, designR.value.accent, designR.value.image_prompt); } catch(e) {}
+  let data;
+  try {
+    const res = await fetch(`${backendUrl}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, platforms, groq_key: apiKey, model })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Backend error ${res.status}`);
+    }
+    data = await res.json();
+  } catch(e) {
+    btn.disabled = false;
+    document.getElementById('genTxt').innerHTML = '✦ Generate';
+    frame.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--red);font-size:12px;padding:24px;text-align:center;gap:10px;">
+      <div>⚠️ Backend not reachable</div>
+      <div style="font-size:10.5px;color:var(--muted-fg);line-height:1.6;">Start the backend:<br><code style="background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;">cd backend && uvicorn main:app --reload</code><br>Then check ⚙ Settings → Backend URL</div>
+    </div>`;
+    capsCol.innerHTML = '';
+    toast('❌ ' + e.message);
+    return;
   }
 
-  // Render poster using Groq's layout + visual_style decisions
-  if (designR.status === 'fulfilled') {
-    frame.innerHTML = renderPosterHTML(designR.value, bgUrl);
-    generatedImageUrl = bgUrl || 'poster-ready';
-  } else {
-    frame.innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--red);font-size:13px;padding:20px;text-align:center;">Poster failed — try again</div>`;
-  }
+  const { poster_content: content, captions: capData, design_config: design, image_url: bgUrl } = data;
+  generatedImageUrl = bgUrl || 'poster-ready';
+
+  // Render poster using template + design config from backend
+  frame.innerHTML = renderPosterHTML(content, design, bgUrl);
 
   // Captions
   capsCol.innerHTML = '';
-  if (capR.status === 'fulfilled') {
+  if (capData && platforms.some(p => capData[p])) {
     platforms.forEach((p, i) => {
-      if (capR.value[p]) capsCol.appendChild(makeCap(p, capR.value[p], i));
+      if (capData[p]) capsCol.appendChild(makeCap(p, capData[p], i));
     });
   } else {
-    const errMsg = capR.reason?.message || String(capR.reason) || 'Unknown error';
-    console.error('Caption generation failed:', capR.reason);
-    capsCol.innerHTML = `<div class="glass-card" style="padding:20px;color:var(--red);font-size:13px;line-height:1.6">
-      ⚠️ Captions failed: ${errMsg}<br>
-      <span style="color:var(--muted-fg);font-size:12px;margin-top:6px;display:block">Check ⚙ Settings → your Groq API key</span>
-    </div>`;
-    toast('❌ ' + errMsg);
+    capsCol.innerHTML = `<div class="glass-card" style="padding:20px;color:var(--muted-fg);font-size:13px;">No captions returned — try regenerating.</div>`;
   }
 
   btn.disabled = false;
@@ -1031,7 +1042,7 @@ async function generate() {
 
 /* ─── AI CALL with auto-retry on 429 ─────────────────────── */
 async function geminiCall(apiKey, body, maxRetries = 4) {
-  let delay = 8000; // start with 8s
+  let delay = 8000;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const r = await fetch(`${GROQ_API_BASE}/chat/completions`, {
       method: 'POST',
@@ -1041,244 +1052,235 @@ async function geminiCall(apiKey, body, maxRetries = 4) {
     const d = await r.json();
     if (r.ok) return d;
     if (r.status === 429 && attempt < maxRetries) {
-      // Respect retryDelay from Gemini if provided, otherwise use exponential backoff
-      const retryAfterMs = d.error?.details?.find(x => x.retryDelay)?.retryDelay
-        ? parseInt(d.error.details.find(x => x.retryDelay).retryDelay) * 1000
-        : delay;
-      console.warn(`Gemini 429 — retrying in ${retryAfterMs/1000}s (attempt ${attempt+1}/${maxRetries})`);
-      toast(`⏳ Rate limit hit — retrying in ${Math.round(retryAfterMs/1000)}s...`);
-      await new Promise(res => setTimeout(res, retryAfterMs));
-      delay = Math.min(delay * 2, 60000); // max 60s backoff
+      toast(`⏳ Rate limit — retrying in ${Math.round(delay/1000)}s...`);
+      await new Promise(res => setTimeout(res, delay));
+      delay = Math.min(delay * 2, 60000);
       continue;
     }
-    const msg = d.error?.message || `Groq error ${r.status}`;
-    console.error('Groq error:', d);
-    throw new Error(msg);
+    throw new Error(d.error?.message || `Groq error ${r.status}`);
   }
 }
 
-/* ─── POSTER DESIGN: Groq (content + layout + image prompt) ── */
-async function genPosterDesign(apiKey, model, topic) {
-  const d = await geminiCall(apiKey, {
-    model, temperature: 0.85, max_tokens: 700,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: 'You are a professional graphic designer and AI image prompt engineer. Return only valid JSON.' },
-      { role: 'user', content:
-        `Design a complete social media marketing poster for: "${topic}"\n\n` +
-        `Return JSON with exactly these keys:\n` +
-        `- "headline": Bold ALL CAPS headline, max 5 words\n` +
-        `- "subheadline": Supporting statement, max 8 words\n` +
-        `- "description": 1-2 sentence description\n` +
-        `- "points": Array of exactly 4 bullet points, max 5 words each\n` +
-        `- "stat": Impressive metric (e.g. "500+", "99%", "10X")\n` +
-        `- "stat_label": Short label for stat, max 4 words\n` +
-        `- "cta": Call-to-action button text, max 5 words\n` +
-        `- "accent": Hex color that fits the topic theme (e.g. "#7c3aed")\n` +
-        `- "layout": One of "left-text" | "bottom-text" | "right-text" | "center-overlay" — pick the layout that best fits this topic's visual composition\n` +
-        `- "visual_style": One of "dark-gradient" | "neon-glow" | "cinematic" | "minimal-dark" — the mood that fits the topic\n` +
-        `- "image_prompt": You are a professional graphic designer. Convert the idea into a detailed image generation prompt. Create a COMPLETE premium marketing poster visual (NOT a simple background). Include:\n` +
-        `  * Poster layout and visual hierarchy\n` +
-        `  * Typography style (font mood, weight — but NO actual text/letters in image)\n` +
-        `  * Background style and texture\n` +
-        `  * Specific objects and subjects relevant to "${topic}"\n` +
-        `  * Cinematic lighting direction and quality\n` +
-        `  * Exact color palette with mood\n` +
-        `  * Empty clean areas on the ${'{layout}'} side for text overlay\n` +
-        `  * Premium branding style (luxury, tech, corporate, etc.)\n` +
-        `  Composition must leave deliberate empty space where the HTML text overlay will appear. Output as comma-separated prompt tags, 80-120 words. NO text, NO letters, NO watermarks, NO logos in the image.`
-      }
-    ]
-  });
-  const raw = d.choices?.[0]?.message?.content?.trim() || '{}';
-  try { return JSON.parse(raw); }
-  catch { return {
-    headline: topic.toUpperCase().slice(0,30),
-    subheadline: 'Professional. Powerful. Proven.',
-    description: topic,
-    points: ['Top Quality Results','Expert Team','Fast Delivery','Best Value'],
-    stat: '100%', stat_label: 'Client Satisfaction',
-    cta: 'Get Started Today', accent: '#7c3aed',
-    layout: 'bottom-text', visual_style: 'dark-gradient',
-    image_prompt: `dark atmospheric background, ${topic}, cinematic lighting, deep blue tones, professional, no text`
-  }; }
-}
-
-/* ─── BACKGROUND IMAGE: Pollinations FLUX ─────────────────── */
-async function genBgImage(topic, accent, enhancedPrompt) {
-  const base = enhancedPrompt
-    ? enhancedPrompt
-    : `abstract dark background, ${topic}, deep navy blue gradient, glowing bokeh particles, premium cinematic texture, atmospheric, professional`;
-  const desc = encodeURIComponent(`${base}, no text, no words, no letters, no watermark, no logo, no signature`);
-  const neg  = encodeURIComponent('text, words, letters, watermark, logo, signature, brand mark, url, website, copyright, blurry, low quality, ugly, flat, white background');
-  const seed = Math.floor(Math.random() * 999999);
-  const url  = `https://image.pollinations.ai/prompt/${desc}?width=1024&height=1280&model=flux-pro&seed=${seed}&nologo=true&nofeed=true&negative=${neg}`;
-  return new Promise(resolve => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(url);
-    img.onerror = () => resolve('');
-    setTimeout(() => resolve(url), 30000);
-    img.src = url;
-  });
-}
-
-/* ─── STRIP MARKDOWN FROM TEXT ─────────────────────────────── */
+/* ─── STRIP MARKDOWN ────────────────────────────────────────── */
 function clean(s){ return (s||'').replace(/\*\*/g,'').replace(/\*/g,'').replace(/#{1,6}\s?/g,'').replace(/`/g,'').trim(); }
 
-/* ─── RENDER POSTER HTML (AI-driven dynamic layout) ─────────── */
-function renderPosterHTML(c, bgUrl) {
-  const accent = c.accent || '#7c3aed';
-  const layout = c.layout || 'bottom-text';
-  const vStyle = c.visual_style || 'dark-gradient';
+/* ═══════════════════════════════════════════════════════════════
+   POSTER RENDERER — 5 professional templates (Groq-selected)
+   content = poster_content, design = design_config, bgUrl = image_url
+   ═══════════════════════════════════════════════════════════════ */
+function renderPosterHTML(c, design, bgUrl) {
+  const tpl       = (design?.template       || 'saas').toLowerCase().replace(/\s/g,'-');
+  const primary   = design?.primary_color   || '#7c3aed';
+  const secondary = design?.secondary_color || '#22d3ee';
+  const layout    = design?.layout          || 'bottom-text';
 
-  const hex = accent.replace('#','');
-  const cr = parseInt(hex.slice(0,2),16), cg = parseInt(hex.slice(2,4),16), cb = parseInt(hex.slice(4,6),16);
-  const aa = (a) => `rgba(${cr},${cg},${cb},${a})`;
+  /* hex → rgba helpers */
+  const hx = h => { const x=h.replace('#',''); return [parseInt(x.slice(0,2),16),parseInt(x.slice(2,4),16),parseInt(x.slice(4,6),16)]; };
+  const [pr,pg,pb] = hx(primary);
+  const [sr,sg,sb] = hx(secondary);
+  const p = a => `rgba(${pr},${pg},${pb},${a})`;
+  const s = a => `rgba(${sr},${sg},${sb},${a})`;
 
-  const headline    = clean(c.headline    || '');
-  const subheadline = clean(c.subheadline || '');
-  const description = clean(c.description || '');
-  const pts   = (c.points||[]).slice(0,4);
-  const stat       = clean(c.stat       || '');
-  const stat_label = clean(c.stat_label || '');
-  const cta        = clean(c.cta        || 'Get Started Today');
-  const icons = ['🎯','⚡','💡','🚀'];
+  /* content */
+  const headline    = clean(c?.headline    || '');
+  const subheadline = clean(c?.subheadline || '');
+  const description = clean(c?.description || '');
+  const pts         = (c?.points||[]).slice(0,4).map(x=>clean(x));
+  const stat        = clean(c?.stat        || '');
+  const stat_label  = clean(c?.stat_label  || '');
+  const cta         = clean(c?.cta         || 'Get Started');
+  const icons       = ['🎯','⚡','💡','🚀'];
 
-  /* ── background image ── */
-  const bgImg = bgUrl
+  /* background image */
+  const bgEl = bgUrl
     ? `<img src="${bgUrl}" crossorigin="anonymous" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;">`
-    : `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#030b1a,#0d0520,#030b1a);z-index:0;"></div>`;
+    : `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#030b1a,#0d0520);z-index:0;"></div>`;
 
-  /* ── overlay gradient — darkens the side where text lives ── */
-  const overlays = {
-    'left-text':      `linear-gradient(90deg,rgba(3,7,20,0.97) 0%,rgba(3,7,20,0.93) 42%,rgba(3,7,20,0.35) 68%,transparent 100%)`,
-    'right-text':     `linear-gradient(270deg,rgba(3,7,20,0.97) 0%,rgba(3,7,20,0.93) 42%,rgba(3,7,20,0.35) 68%,transparent 100%)`,
-    'bottom-text':    `linear-gradient(to top,rgba(3,7,20,0.99) 0%,rgba(3,7,20,0.96) 38%,rgba(3,7,20,0.5) 60%,transparent 100%)`,
-    'center-overlay': `linear-gradient(170deg,rgba(3,7,20,0.82) 0%,rgba(10,4,35,0.70) 50%,rgba(3,7,20,0.88) 100%)`,
+  /* overlay gradient — darkens the text side */
+  const ov = {
+    'left-text':      `linear-gradient(90deg,rgba(4,6,18,.97) 0%,rgba(4,6,18,.93) 44%,rgba(4,6,18,.3) 68%,transparent 100%)`,
+    'right-text':     `linear-gradient(270deg,rgba(4,6,18,.97) 0%,rgba(4,6,18,.93) 44%,rgba(4,6,18,.3) 68%,transparent 100%)`,
+    'bottom-text':    `linear-gradient(to top,rgba(4,6,18,.99) 0%,rgba(4,6,18,.96) 40%,rgba(4,6,18,.55) 62%,transparent 100%)`,
+    'center-overlay': `linear-gradient(170deg,rgba(4,6,18,.82),rgba(10,4,32,.72),rgba(4,6,18,.88))`,
   };
-  const overlayGrad = overlays[layout] || overlays['bottom-text'];
+  const overlay = ov[layout] || ov['bottom-text'];
 
-  /* ── visual-style extra decoration ── */
-  const decorations = {
-    'dark-gradient': `
-      <div style="position:absolute;top:-100px;right:-80px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,${aa(0.45)},transparent 65%);z-index:2;animation:pOrb 7s ease-in-out infinite;"></div>
-      <div style="position:absolute;bottom:-60px;left:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(0,180,255,0.2),transparent 65%);z-index:2;animation:pOrb 9s ease-in-out infinite reverse;"></div>
-      <div style="position:absolute;inset:0;z-index:1;background-image:radial-gradient(circle,rgba(255,255,255,0.07) 1px,transparent 1px);background-size:28px 28px;animation:pGrid 6s ease infinite;"></div>`,
-    'neon-glow': `
-      <div style="position:absolute;top:10%;left:50%;transform:translateX(-50%);width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,${aa(0.35)},transparent 60%);z-index:2;animation:pOrb 5s ease-in-out infinite;filter:blur(2px);"></div>
-      <div style="position:absolute;bottom:-20px;right:-20px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(0,230,255,0.25),transparent 65%);z-index:2;animation:pOrb 8s ease-in-out infinite reverse;"></div>
-      <div style="position:absolute;inset:0;z-index:1;background:repeating-linear-gradient(0deg,transparent,transparent 39px,${aa(0.04)} 40px);pointer-events:none;"></div>`,
-    'cinematic': `
-      <div style="position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,transparent,${accent},${aa(0.6)},transparent);z-index:3;"></div>
-      <div style="position:absolute;bottom:0;left:0;right:0;height:6px;background:linear-gradient(90deg,transparent,${accent},${aa(0.6)},transparent);z-index:3;"></div>
-      <div style="position:absolute;top:20px;left:20px;width:40px;height:40px;border-top:2px solid ${aa(0.7)};border-left:2px solid ${aa(0.7)};z-index:4;"></div>
-      <div style="position:absolute;top:20px;right:20px;width:40px;height:40px;border-top:2px solid ${aa(0.7)};border-right:2px solid ${aa(0.7)};z-index:4;"></div>
-      <div style="position:absolute;bottom:20px;left:20px;width:40px;height:40px;border-bottom:2px solid ${aa(0.7)};border-left:2px solid ${aa(0.7)};z-index:4;"></div>
-      <div style="position:absolute;bottom:20px;right:20px;width:40px;height:40px;border-bottom:2px solid ${aa(0.7)};border-right:2px solid ${aa(0.7)};z-index:4;"></div>`,
-    'minimal-dark': `
-      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${accent};z-index:3;"></div>
-      <div style="position:absolute;inset:0;z-index:1;background-image:linear-gradient(${aa(0.06)} 1px,transparent 1px),linear-gradient(90deg,${aa(0.06)} 1px,transparent 1px);background-size:40px 40px;"></div>`,
+  /* text panel CSS */
+  const pp = {
+    'left-text':      'position:absolute;left:0;top:0;width:54%;height:100%;z-index:5;display:flex;flex-direction:column;justify-content:center;padding:32px 18px 32px 28px;',
+    'right-text':     'position:absolute;right:0;top:0;width:54%;height:100%;z-index:5;display:flex;flex-direction:column;justify-content:center;padding:32px 28px 32px 18px;',
+    'bottom-text':    'position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;flex-direction:column;justify-content:flex-end;padding:20px 28px 32px;',
+    'center-overlay': 'position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:32px 24px;text-align:center;',
   };
-  const decor = decorations[vStyle] || decorations['dark-gradient'];
+  const panelPos   = pp[layout] || pp['bottom-text'];
+  const isCenter   = layout === 'center-overlay';
+  const isBottom   = layout === 'bottom-text';
+  const alignSelf  = isCenter ? 'center' : 'flex-start';
+  const maxPts     = isBottom ? 2 : 4;
+  const headSz     = isBottom ? '22px' : '27px';
 
-  /* ── text panel & content ── */
-  const isCenter  = layout === 'center-overlay';
-  const isLeft    = layout === 'left-text';
-  const isRight   = layout === 'right-text';
-  const isBottom  = layout === 'bottom-text';
-
-  const textAlign = isCenter ? 'center' : 'left';
-  const alignSelf = isCenter ? 'center' : 'flex-start';
-
-  const panelStyle = {
-    'left-text':      'position:absolute;left:0;top:0;width:54%;height:100%;z-index:5;display:flex;flex-direction:column;justify-content:center;padding:32px 20px 32px 28px;',
-    'right-text':     'position:absolute;right:0;top:0;width:54%;height:100%;z-index:5;display:flex;flex-direction:column;justify-content:center;padding:32px 28px 32px 20px;',
-    'bottom-text':    'position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;flex-direction:column;justify-content:flex-end;padding:18px 26px 32px;',
-    'center-overlay': 'position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:32px 26px;text-align:center;',
-  }[layout];
-
-  /* badge / accent line above headline */
-  const badge = `<div style="display:inline-flex;align-items:center;gap:6px;background:${aa(0.18)};border:1px solid ${aa(0.5)};border-radius:20px;padding:4px 12px;margin-bottom:12px;align-self:${alignSelf};">
-    <div style="width:7px;height:7px;border-radius:50%;background:${accent};box-shadow:0 0 8px ${accent};animation:pPulse 2s ease-in-out infinite;"></div>
-    <span style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${accent};">PostAI</span>
-  </div>`;
-
-  /* headline */
-  const headlineEl = `<div style="font-size:${isBottom?'22px':'26px'};font-weight:900;letter-spacing:-0.5px;line-height:1.1;color:#fff;margin-bottom:8px;text-shadow:0 2px 20px rgba(0,0,0,0.8);${isCenter?'text-align:center;':''}">
-    ${headline}
-  </div>`;
-
-  /* subheadline */
-  const subEl = `<div style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.75);margin-bottom:${isBottom?'10px':'14px'};letter-spacing:0.3px;${isCenter?'text-align:center;':''}">
-    ${subheadline}
-  </div>`;
-
-  /* accent divider */
-  const divider = `<div style="width:44px;height:3px;border-radius:2px;background:linear-gradient(90deg,${accent},${aa(0.3)});margin-bottom:${isBottom?'10px':'14px'};${isCenter?'margin-left:auto;margin-right:auto;':''}animation:pPulse 2.5s ease-in-out infinite;"></div>`;
-
-  /* points — show fewer in bottom layout to save space */
-  const maxPts = isBottom ? 2 : 4;
-  const ptEls = pts.slice(0,maxPts).map((p,i) => `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;animation:pFade 0.5s ease both;animation-delay:${0.1+i*0.08}s;">
-      <div style="width:20px;height:20px;border-radius:6px;background:${aa(0.25)};border:1px solid ${aa(0.4)};display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;">${icons[i]}</div>
-      <span style="font-size:11px;color:rgba(255,255,255,0.85);font-weight:500;">${clean(p)}</span>
-    </div>`).join('');
-
-  /* stat block */
-  const statEl = stat ? `
-    <div style="display:inline-flex;flex-direction:column;align-items:${isCenter?'center':'flex-start'};background:${aa(0.15)};border:1px solid ${aa(0.4)};border-radius:12px;padding:10px 16px;margin-bottom:14px;">
-      <span style="font-size:28px;font-weight:900;color:${accent};line-height:1;text-shadow:0 0 20px ${aa(0.6)};">${stat}</span>
-      <span style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:2px;letter-spacing:0.5px;">${stat_label}</span>
-    </div>` : '';
-
-  /* description */
-  const descEl = (!isBottom && description) ? `<p style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.5;margin-bottom:14px;${isCenter?'text-align:center;max-width:260px;':''}">${description}</p>` : '';
-
-  /* CTA button */
-  const ctaEl = `<div style="display:inline-flex;align-items:center;gap:8px;background:${accent};border-radius:24px;padding:10px 20px;font-size:11px;font-weight:700;color:#fff;letter-spacing:0.5px;box-shadow:0 4px 20px ${aa(0.5)};position:relative;overflow:hidden;align-self:${alignSelf};">
-    <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);animation:pSheen 2.5s ease infinite;"></span>
-    ${cta} →
-  </div>`;
-
-  /* logo mark */
-  const logo = `<div style="position:absolute;${isRight?'left':'right'}:20px;top:20px;z-index:6;font-size:9px;font-weight:800;letter-spacing:2px;color:${aa(0.6)};text-transform:uppercase;">PostAI</div>`;
-
-  /* stat in corner for layouts that have space */
-  const cornerStat = (isLeft || isRight) && stat ? `
-    <div style="position:absolute;${isLeft?'right':'left'}:20px;bottom:28px;z-index:5;text-align:center;">
-      <div style="font-size:30px;font-weight:900;color:${accent};text-shadow:0 0 24px ${aa(0.7)};line-height:1;">${stat}</div>
-      <div style="font-size:9px;color:rgba(255,255,255,0.55);letter-spacing:0.5px;margin-top:2px;">${stat_label}</div>
-    </div>` : '';
-
-  /* ── assemble panel content ── */
-  let panelInner = '';
-  if (isBottom) {
-    panelInner = badge + headlineEl + subEl + divider + ptEls + ctaEl;
-  } else if (isCenter) {
-    panelInner = badge + headlineEl + subEl + divider + (stat ? statEl : '') + descEl + ptEls + ctaEl;
-  } else {
-    // left or right
-    panelInner = badge + headlineEl + subEl + divider + descEl + ptEls + ctaEl;
-  }
-
-  /* ── keyframes ── */
+  /* shared keyframes */
   const kf = `<style>
-    @keyframes pOrb{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-14px) scale(1.06)}}
-    @keyframes pPulse{0%,100%{box-shadow:0 0 12px ${aa(0.3)}}50%{box-shadow:0 0 32px ${aa(0.8)}}}
-    @keyframes pSheen{0%{transform:translateX(-120%) rotate(30deg)}100%{transform:translateX(300%) rotate(30deg)}}
-    @keyframes pFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes pGrid{0%,100%{opacity:0.05}50%{opacity:0.12}}
+    @keyframes pOrb  {0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-12px) scale(1.05)}}
+    @keyframes pPulse{0%,100%{opacity:.7}50%{opacity:1}}
+    @keyframes pSheen{0%{transform:translateX(-120%) rotate(25deg)}100%{transform:translateX(320%) rotate(25deg)}}
+    @keyframes pFade {from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pBlink{0%,100%{opacity:1}50%{opacity:.3}}
+    @keyframes pGrid {0%,100%{opacity:.05}50%{opacity:.12}}
   </style>`;
 
+  /* ── SAAS template ── */
+  if (tpl === 'saas') {
+    const ptList = pts.slice(0,maxPts).map((pt,i)=>`
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;animation:pFade .5s ease both;animation-delay:${.1+i*.07}s;">
+        <div style="width:18px;height:18px;border-radius:5px;background:${p(.2)};border:1px solid ${p(.5)};display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;color:${primary};">✓</div>
+        <span style="font-size:11.5px;color:rgba(255,255,255,.82);font-weight:500;">${pt}</span>
+      </div>`).join('');
+    return kf + `
+    <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#040612;">
+      ${bgEl}
+      <div style="position:absolute;inset:0;background:${overlay};z-index:1;"></div>
+      <div style="position:absolute;inset:0;z-index:1;background-image:radial-gradient(circle,rgba(255,255,255,.06) 1px,transparent 1px);background-size:26px 26px;animation:pGrid 6s ease infinite;pointer-events:none;"></div>
+      <div style="position:absolute;top:-80px;right:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,${p(.5)},transparent 65%);z-index:2;animation:pOrb 7s ease-in-out infinite;pointer-events:none;"></div>
+      <div style="position:absolute;bottom:-50px;left:-30px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,${s(.25)},transparent 65%);z-index:2;animation:pOrb 9s ease-in-out infinite reverse;pointer-events:none;"></div>
+      <div style="position:absolute;right:18px;top:18px;z-index:6;font-size:9px;font-weight:800;letter-spacing:2.5px;color:${p(.55)};text-transform:uppercase;">PostAI</div>
+      <div style="${panelPos}">
+        <div style="display:inline-flex;align-items:center;gap:6px;background:${p(.15)};border:1px solid ${p(.45)};border-radius:20px;padding:4px 12px;margin-bottom:13px;align-self:${alignSelf};">
+          <div style="width:6px;height:6px;border-radius:50%;background:${primary};animation:pBlink 1.8s ease-in-out infinite;"></div>
+          <span style="font-size:9.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${primary};">Live Now</span>
+        </div>
+        <div style="font-size:${headSz};font-weight:900;letter-spacing:-.5px;line-height:1.1;color:#fff;margin-bottom:8px;text-shadow:0 2px 16px rgba(0,0,0,.8);">${headline}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.72);margin-bottom:12px;font-weight:500;">${subheadline}</div>
+        <div style="width:40px;height:3px;border-radius:2px;background:linear-gradient(90deg,${primary},${secondary});margin-bottom:14px;${isCenter?'margin-left:auto;margin-right:auto;':''}"></div>
+        ${!isBottom?`<p style="font-size:11px;color:rgba(255,255,255,.58);line-height:1.5;margin-bottom:12px;${isCenter?'text-align:center;max-width:250px;':''}">${description}</p>`:''}
+        ${ptList}
+        ${stat?`<div style="display:inline-flex;flex-direction:column;align-items:${isCenter?'center':'flex-start'};margin-bottom:14px;margin-top:4px;"><span style="font-size:30px;font-weight:900;color:${primary};line-height:1;text-shadow:0 0 20px ${p(.6)};">${stat}</span><span style="font-size:9.5px;color:rgba(255,255,255,.55);margin-top:1px;letter-spacing:.5px;">${stat_label}</span></div>`:''}
+        <div style="display:inline-flex;align-items:center;gap:8px;background:${primary};border-radius:22px;padding:10px 20px;font-size:11.5px;font-weight:700;color:#fff;box-shadow:0 4px 18px ${p(.5)};position:relative;overflow:hidden;align-self:${alignSelf};">
+          <span style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);animation:pSheen 2.4s ease infinite;"></span>
+          ${cta} →
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /* ── CYBER-AI template ── */
+  if (tpl === 'cyber-ai') {
+    const ptList = pts.slice(0,maxPts).map((pt,i)=>`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;animation:pFade .5s ease both;animation-delay:${.1+i*.07}s;">
+        <div style="width:4px;height:4px;background:${secondary};border-radius:50%;box-shadow:0 0 6px ${secondary};flex-shrink:0;"></div>
+        <span style="font-size:11px;color:rgba(255,255,255,.8);font-weight:500;letter-spacing:.3px;">${pt}</span>
+      </div>`).join('');
+    return kf + `
+    <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#020a10;">
+      ${bgEl}
+      <div style="position:absolute;inset:0;background:${overlay};z-index:1;"></div>
+      <div style="position:absolute;inset:0;z-index:1;background:repeating-linear-gradient(0deg,transparent,transparent 39px,${s(.05)} 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,${s(.05)} 40px);pointer-events:none;"></div>
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${secondary},${primary},transparent);z-index:4;"></div>
+      <div style="position:absolute;top:28px;left:28px;width:14px;height:14px;border-top:2px solid ${secondary};border-left:2px solid ${secondary};z-index:5;"></div>
+      <div style="position:absolute;top:28px;right:28px;width:14px;height:14px;border-top:2px solid ${secondary};border-right:2px solid ${secondary};z-index:5;"></div>
+      <div style="position:absolute;bottom:28px;left:28px;width:14px;height:14px;border-bottom:2px solid ${secondary};border-left:2px solid ${secondary};z-index:5;"></div>
+      <div style="position:absolute;bottom:28px;right:28px;width:14px;height:14px;border-bottom:2px solid ${secondary};border-right:2px solid ${secondary};z-index:5;"></div>
+      <div style="position:absolute;right:20px;top:18px;z-index:6;font-size:8px;font-weight:700;letter-spacing:3px;color:${s(.5)};text-transform:uppercase;">PostAI //</div>
+      <div style="${panelPos}">
+        <div style="display:inline-flex;align-items:center;gap:6px;border:1px solid ${s(.5)};border-radius:3px;padding:3px 10px;margin-bottom:13px;align-self:${alignSelf};">
+          <span style="font-size:8.5px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${secondary};">SYS.ACTIVE</span>
+          <div style="width:5px;height:5px;border-radius:50%;background:${secondary};animation:pBlink 1s ease-in-out infinite;"></div>
+        </div>
+        <div style="font-size:${headSz};font-weight:900;letter-spacing:1px;line-height:1.1;color:#fff;margin-bottom:8px;text-shadow:0 0 30px ${p(.8)};">${headline}</div>
+        <div style="font-size:11.5px;color:${secondary};margin-bottom:12px;font-weight:600;letter-spacing:.5px;">${subheadline}</div>
+        <div style="width:50px;height:2px;background:${secondary};margin-bottom:14px;${isCenter?'margin-left:auto;margin-right:auto;':''}box-shadow:0 0 8px ${secondary};"></div>
+        ${!isBottom?`<p style="font-size:10.5px;color:rgba(255,255,255,.55);line-height:1.5;margin-bottom:12px;letter-spacing:.2px;">${description}</p>`:''}
+        ${ptList}
+        ${stat?`<div style="display:inline-flex;align-items:baseline;gap:6px;margin-bottom:14px;margin-top:2px;"><span style="font-size:32px;font-weight:900;color:${secondary};line-height:1;text-shadow:0 0 24px ${secondary};">${stat}</span><span style="font-size:9px;color:rgba(255,255,255,.45);letter-spacing:.5px;">${stat_label}</span></div>`:''}
+        <div style="display:inline-flex;align-items:center;gap:8px;border:1.5px solid ${secondary};border-radius:3px;padding:9px 18px;font-size:11px;font-weight:700;color:${secondary};letter-spacing:1px;text-transform:uppercase;position:relative;overflow:hidden;align-self:${alignSelf};background:${s(.08)};">
+          <span style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,${s(.18)},transparent);animation:pSheen 2s ease infinite;"></span>
+          ${cta} ›
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /* ── CORPORATE template ── */
+  if (tpl === 'corporate') {
+    const ptList = pts.slice(0,maxPts).map((pt,i)=>`
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:9px;animation:pFade .5s ease both;animation-delay:${.1+i*.07}s;">
+        <div style="width:3px;height:3px;border-radius:50%;background:${primary};margin-top:5px;flex-shrink:0;"></div>
+        <span style="font-size:11.5px;color:rgba(255,255,255,.78);line-height:1.4;">${pt}</span>
+      </div>`).join('');
+    return kf + `
+    <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#060d1e;">
+      ${bgEl}
+      <div style="position:absolute;inset:0;background:${overlay};z-index:1;"></div>
+      <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(to bottom,${primary},${secondary},${primary});z-index:4;"></div>
+      <div style="position:absolute;right:20px;top:16px;z-index:6;font-size:8px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,.3);text-transform:uppercase;">PostAI</div>
+      <div style="${panelPos}">
+        <div style="font-size:8.5px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:${primary};margin-bottom:12px;">${stat_label || 'Enterprise Solution'}</div>
+        <div style="width:32px;height:2px;background:${primary};margin-bottom:14px;${isCenter?'margin-left:auto;margin-right:auto;':''}"></div>
+        <div style="font-size:${headSz};font-weight:800;letter-spacing:-.3px;line-height:1.1;color:#fff;margin-bottom:10px;">${headline}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.65);margin-bottom:16px;font-style:italic;">${subheadline}</div>
+        ${!isBottom?`<p style="font-size:11px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:14px;">${description}</p>`:''}
+        ${ptList}
+        ${stat?`<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:10px 0;border-top:1px solid rgba(255,255,255,.1);border-bottom:1px solid rgba(255,255,255,.1);"><span style="font-size:34px;font-weight:900;color:${primary};">${stat}</span><span style="font-size:10px;color:rgba(255,255,255,.5);line-height:1.3;max-width:80px;">${stat_label}</span></div>`:''}
+        <div style="display:inline-flex;align-items:center;background:${primary};padding:10px 22px;font-size:11px;font-weight:600;color:#fff;letter-spacing:.5px;align-self:${alignSelf};">
+          ${cta} →
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /* ── MINIMAL template ── */
+  if (tpl === 'minimal') {
+    const ptList = pts.slice(0,maxPts).map((pt,i)=>`
+      <div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:7px;padding-left:12px;border-left:2px solid ${p(.4)};animation:pFade .5s ease both;animation-delay:${.1+i*.07}s;">${pt}</div>`).join('');
+    return kf + `
+    <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#080808;">
+      ${bgEl}
+      <div style="position:absolute;inset:0;background:${overlay};z-index:1;"></div>
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${primary};z-index:4;"></div>
+      <div style="position:absolute;right:20px;top:18px;z-index:6;font-size:8px;font-weight:500;letter-spacing:3px;color:rgba(255,255,255,.25);text-transform:uppercase;">PostAI</div>
+      <div style="${panelPos}">
+        ${stat?`<div style="font-size:52px;font-weight:900;color:${primary};line-height:1;margin-bottom:8px;letter-spacing:-2px;">${stat}</div>`:''}
+        <div style="font-size:${headSz};font-weight:700;line-height:1.15;color:#fff;margin-bottom:8px;letter-spacing:-.3px;">${headline}</div>
+        <div style="width:30px;height:2px;background:${primary};margin-bottom:12px;${isCenter?'margin-left:auto;margin-right:auto;':''}"></div>
+        <div style="font-size:11.5px;color:rgba(255,255,255,.6);margin-bottom:14px;line-height:1.5;">${subheadline}</div>
+        ${ptList}
+        <div style="display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.25);padding:9px 20px;font-size:11px;color:rgba(255,255,255,.8);margin-top:10px;align-self:${alignSelf};letter-spacing:.5px;">
+          ${cta} →
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /* ── GLASSMORPHISM template (default) ── */
+  const ptList = pts.slice(0,maxPts).map((pt,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;animation:pFade .5s ease both;animation-delay:${.1+i*.07}s;">
+      <div style="width:16px;height:16px;border-radius:50%;background:${p(.25)};border:1px solid ${p(.5)};display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;">${icons[i]||'•'}</div>
+      <span style="font-size:11px;color:rgba(255,255,255,.85);font-weight:500;">${pt}</span>
+    </div>`).join('');
   return kf + `
-  <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#030b1a;">
-    ${bgImg}
-    <div style="position:absolute;inset:0;background:${overlayGrad};z-index:1;"></div>
-    ${decor}
-    ${logo}
-    ${cornerStat}
-    <div style="${panelStyle}">${panelInner}</div>
+  <div class="poster-design" style="position:absolute;inset:0;font-family:'Inter',sans-serif;overflow:hidden;color:#fff;background:#0a0520;">
+    ${bgEl}
+    <div style="position:absolute;inset:0;background:${overlay};z-index:1;"></div>
+    <div style="position:absolute;top:-120px;right:-80px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,${p(.45)},transparent 65%);z-index:2;animation:pOrb 8s ease-in-out infinite;filter:blur(2px);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-80px;left:-50px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,${s(.3)},transparent 65%);z-index:2;animation:pOrb 10s ease-in-out infinite reverse;filter:blur(2px);pointer-events:none;"></div>
+    <div style="position:absolute;right:18px;top:18px;z-index:6;font-size:9px;font-weight:700;letter-spacing:2px;color:${p(.5)};text-transform:uppercase;">PostAI</div>
+    <div style="${panelPos}">
+      <div style="background:rgba(255,255,255,.07);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:${isBottom?'18px 20px':'22px'};display:flex;flex-direction:column;">
+        <div style="display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;align-self:${alignSelf};">
+          <div style="width:6px;height:6px;border-radius:50%;background:${secondary};box-shadow:0 0 8px ${secondary};animation:pBlink 2s ease-in-out infinite;"></div>
+          <span style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${secondary};">PostAI Studio</span>
+        </div>
+        <div style="font-size:${headSz};font-weight:900;line-height:1.1;color:#fff;margin-bottom:7px;letter-spacing:-.3px;">${headline}</div>
+        <div style="font-size:11.5px;color:rgba(255,255,255,.65);margin-bottom:12px;">${subheadline}</div>
+        <div style="height:1px;background:linear-gradient(90deg,${p(.4)},${s(.3)},transparent);margin-bottom:12px;"></div>
+        ${ptList}
+        ${stat?`<div style="display:flex;align-items:center;gap:10px;margin-top:4px;margin-bottom:12px;"><span style="font-size:28px;font-weight:900;color:${primary};text-shadow:0 0 20px ${p(.7)};">${stat}</span><span style="font-size:9.5px;color:rgba(255,255,255,.5);">${stat_label}</span></div>`:''}
+        <div style="display:inline-flex;align-items:center;background:linear-gradient(135deg,${primary},${secondary});border-radius:24px;padding:9px 18px;font-size:11px;font-weight:700;color:#fff;align-self:${alignSelf};box-shadow:0 4px 18px ${p(.45)};position:relative;overflow:hidden;">
+          <span style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent);animation:pSheen 2.5s ease infinite;"></span>
+          ${cta} →
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1376,10 +1378,16 @@ async function regenerateImage() {
   generatedImageUrl = null;
   try {
     toast('🎨 Regenerating poster...');
-    const design = await genPosterDesign(apiKey, model, topic);
-    const bgUrl  = await genBgImage(topic, design.accent, design.image_prompt);
-    frame.innerHTML = renderPosterHTML(design, bgUrl);
-    generatedImageUrl = bgUrl || 'poster-ready';
+    const backendUrl = getKey('backend') || DEFAULT_BACKEND;
+    const res = await fetch(`${backendUrl}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, platforms: [...activePlatforms], groq_key: apiKey, model })
+    });
+    if (!res.ok) throw new Error(`Backend error ${res.status}`);
+    const data = await res.json();
+    frame.innerHTML = renderPosterHTML(data.poster_content, data.design_config, data.image_url);
+    generatedImageUrl = data.image_url || 'poster-ready';
     toast('🎨 New poster generated!');
   } catch(e) { toast('❌ ' + (e.message || e)); }
 }

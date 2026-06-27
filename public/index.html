@@ -3,352 +3,389 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PostAI — Caption Generator</title>
+  <title>PostAI — AI Caption Generator</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    :root {
-      --bg:      #080810;
-      --surface: #10101c;
-      --card:    #14142a;
-      --border:  #1e1e3a;
-      --primary: #6366f1;
-      --ph:      #818cf8;
-      --text:    #e2e8f0;
-      --muted:   #64748b;
-      --radius:  14px;
-    }
-
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e2e8f0;
+      overflow-x: hidden;
     }
 
-    nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 24px;
-      height: 60px;
-      border-bottom: 1px solid var(--border);
-      background: rgba(8,8,16,.92);
-      backdrop-filter: blur(12px);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-
-    .logo {
-      font-size: 1.2rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, #818cf8, #a78bfa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .api-key-btn {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: .8rem;
-      cursor: pointer;
-      transition: all .2s;
-    }
-
-    .api-key-btn:hover { color: var(--text); border-color: var(--muted); }
-    .api-key-btn.key-set { color: #86efac; border-color: #22c55e44; }
-
-    /* Key modal */
-    .modal-bg {
-      display: none;
+    /* ── Video background ── */
+    .video-bg {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,.7);
-      z-index: 200;
-      align-items: center;
-      justify-content: center;
+      z-index: 0;
     }
 
-    .modal-bg.open { display: flex; }
-
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px;
-      width: 420px;
-      max-width: 90vw;
+    .video-bg video {
+      width: 100%; height: 100%;
+      object-fit: cover;
     }
 
-    .modal h2 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
-    .modal p  { font-size: .83rem; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
-
-    .modal input {
-      width: 100%;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      color: var(--text);
-      font-size: .9rem;
-      padding: 11px 14px;
-      outline: none;
-      margin-bottom: 12px;
-      transition: border-color .2s;
+    .video-bg::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(4, 4, 16, 0.25);
     }
 
-    .modal input:focus { border-color: var(--primary); }
-
-    .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
-
-    .btn-cancel {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      padding: 8px 18px;
-      border-radius: 8px;
-      font-size: .85rem;
-      cursor: pointer;
-    }
-
-    .btn-save {
-      background: var(--primary);
-      border: none;
-      color: #fff;
-      padding: 8px 18px;
-      border-radius: 8px;
-      font-size: .85rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .btn-save:hover { background: var(--ph); }
-
-    main {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 36px 20px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 28px;
-      align-items: start;
-    }
-
-    @media (max-width: 780px) { main { grid-template-columns: 1fr; } }
-
-    /* ── Upload ── */
-    .upload-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-
-    .panel-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-      font-size: .72rem;
-      font-weight: 600;
-      letter-spacing: .09em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .drop-zone {
-      margin: 20px;
-      border: 2px dashed var(--border);
-      border-radius: 12px;
-      padding: 40px 20px;
+    /* ── Layout ── */
+    .page {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 12px;
-      color: var(--muted);
+      padding: 32px 16px 60px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: .2em;
+      color: rgba(255,255,255,.9);
+      margin-bottom: 6px;
+    }
+
+    .tagline {
+      font-size: .85rem;
+      color: rgba(255,255,255,.45);
+      letter-spacing: .05em;
+    }
+
+    /* Settings button */
+    .settings-btn {
+      position: fixed;
+      top: 18px; right: 20px;
+      width: 40px; height: 40px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      color: rgba(255,255,255,.75);
+      border-radius: 50%;
+      font-size: 1.15rem;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 10;
+      transition: all .25s;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0;
+    }
+
+    .settings-btn:hover {
+      background: rgba(255,255,255,.16);
+      color: #fff;
+      border-color: rgba(255,255,255,.35);
+      transform: rotate(45deg);
+    }
+
+    /* ── Main card ── */
+    .card {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 20px;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      padding: 32px;
+      width: 100%;
+      max-width: 600px;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: rgba(255,255,255,.55);
+      margin-bottom: 20px;
+      letter-spacing: .04em;
+    }
+
+    /* ── Upload zone ── */
+    .upload-zone {
+      border: 2px dashed rgba(255,255,255,.2);
+      border-radius: 14px;
+      padding: 36px 20px;
+      text-align: center;
       cursor: pointer;
       transition: all .2s;
-      text-align: center;
+      margin-bottom: 20px;
     }
 
-    .drop-zone:hover, .drop-zone.drag-over {
-      border-color: var(--primary);
-      background: rgba(99,102,241,.05);
-      color: var(--ph);
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: rgba(255,255,255,.5);
+      background: rgba(255,255,255,.03);
     }
 
-    .drop-icon { font-size: 2.5rem; opacity: .5; }
-    .drop-text { font-size: .9rem; }
-    .drop-sub  { font-size: .78rem; opacity: .6; }
+    .upload-icon { font-size: 2.2rem; margin-bottom: 10px; opacity: .6; }
+    .upload-text { font-size: .9rem; color: rgba(255,255,255,.6); margin-bottom: 4px; }
+    .upload-sub  { font-size: .78rem; color: rgba(255,255,255,.35); margin-bottom: 14px; }
 
     .browse-btn {
-      background: var(--primary);
+      background: rgba(255,255,255,.1);
       color: #fff;
-      border: none;
-      padding: 8px 20px;
+      border: 1px solid rgba(255,255,255,.3);
+      padding: 8px 22px;
       border-radius: 8px;
       font-size: .85rem;
       font-weight: 600;
       cursor: pointer;
+      backdrop-filter: blur(4px);
+      transition: background .2s;
     }
 
-    .browse-btn:hover { background: var(--ph); }
+    .browse-btn:hover { background: rgba(255,255,255,.2); }
 
-    .preview-box {
+    /* Preview */
+    .preview-area {
       display: none;
-      margin: 0 20px 16px;
+      margin-bottom: 20px;
       position: relative;
     }
 
-    .preview-box img {
+    .preview-area img {
       width: 100%;
-      border-radius: 10px;
-      max-height: 360px;
+      max-height: 320px;
       object-fit: cover;
+      border-radius: 12px;
       display: block;
     }
 
-    .change-btn {
+    .change-img-btn {
       position: absolute;
-      top: 10px;
-      right: 10px;
-      background: rgba(0,0,0,.75);
+      top: 10px; right: 10px;
+      background: rgba(0,0,0,.3);
       color: #fff;
       border: none;
-      padding: 5px 12px;
-      border-radius: 6px;
+      padding: 5px 13px;
+      border-radius: 7px;
       font-size: .78rem;
       cursor: pointer;
+      backdrop-filter: blur(4px);
     }
 
-    .generate-btn {
-      display: none;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      width: calc(100% - 40px);
-      margin: 0 20px 20px;
-      padding: 13px;
-      background: var(--primary);
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      font-size: .95rem;
+    /* ── Platforms ── */
+    .section-label {
+      font-size: .72rem;
       font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.4);
+      margin-bottom: 12px;
+    }
+
+    .platforms {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 22px;
+      flex-wrap: wrap;
+    }
+
+    .platform-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 50px;
+      border: 1px solid rgba(255,255,255,.15);
+      background: rgba(255,255,255,.05);
       cursor: pointer;
       transition: all .2s;
+      user-select: none;
     }
 
-    .generate-btn:hover { background: var(--ph); transform: translateY(-1px); }
-    .generate-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    .platform-pill:hover { border-color: rgba(255,255,255,.3); }
 
+    .platform-pill.selected { border-color: rgba(255,255,255,.6); background: rgba(255,255,255,.05); }
+
+    .platform-pill input { display: none; }
+
+    .pill-icon {
+      width: 24px; height: 24px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #fff;
+    }
+
+    .li-icon { background: rgba(255,255,255,.15); }
+    .ig-icon { background: rgba(255,255,255,.15); }
+    .fb-icon { background: rgba(255,255,255,.15); }
+
+    .pill-name { font-size: .85rem; font-weight: 500; }
+    .pill-check { margin-left: 4px; font-size: .75rem; opacity: 0; transition: opacity .2s; }
+    .platform-pill.selected .pill-check { opacity: 1; color: rgba(255,255,255,.9); }
+
+    /* ── Generate button ── */
+    .gen-btn {
+      width: 100%;
+      padding: 14px;
+      background: rgba(255,255,255,.05);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.35);
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      letter-spacing: .03em;
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .gen-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .gen-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; filter: none; }
+
+    /* ── Status ── */
     .status {
       display: none;
-      margin: 0 20px 16px;
-      padding: 10px 13px;
-      border-radius: 9px;
+      padding: 10px 14px;
+      border-radius: 10px;
       font-size: .83rem;
+      margin-top: 14px;
       line-height: 1.5;
     }
 
-    .status.info  { display:block; background:rgba(99,102,241,.15); color:#a5b4fc; border:1px solid rgba(99,102,241,.3); }
-    .status.error { display:block; background:rgba(239,68,68,.12); color:#fca5a5; border:1px solid rgba(239,68,68,.25); }
-    .status.ok    { display:block; background:rgba(34,197,94,.12); color:#86efac; border:1px solid rgba(34,197,94,.25); }
+    .status.info  { display:block; background:rgba(255,255,255,.03); color:rgba(255,255,255,.8); border:1px solid rgba(255,255,255,.2); }
+    .status.error { display:block; background:rgba(255,255,255,.03); color:rgba(255,255,255,.7); border:1px solid rgba(255,255,255,.2); }
+    .status.ok    { display:block; background:rgba(255,255,255,.03); color:rgba(255,255,255,.85); border:1px solid rgba(255,255,255,.25); }
 
-    /* ── Caption cards ── */
-    .captions-panel { display: flex; flex-direction: column; gap: 16px; }
-
-    .caption-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
+    /* ── Output card ── */
+    .output-card {
+      display: none;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 20px;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      padding: 28px;
+      width: 100%;
+      max-width: 600px;
+      margin-top: 20px;
     }
 
-    .caption-card-header {
+    .caption-block { margin-bottom: 20px; }
+    .caption-block:last-child { margin-bottom: 0; }
+
+    .caption-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
     }
 
-    .platform-info { display: flex; align-items: center; gap: 10px; }
-
-    .platform-icon {
-      width: 34px; height: 34px;
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
-    }
-
-    .icon-li { background: #0a66c2; }
-    .icon-ig { background: linear-gradient(135deg,#f58529,#dd2a7b,#8134af); }
-    .icon-fb { background: #1877f2; }
-
-    .platform-name  { font-size: .9rem; font-weight: 600; }
-    .platform-chars { font-size: .75rem; color: var(--muted); }
-
-    .copy-btn {
-      background: var(--card);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      padding: 6px 13px;
-      border-radius: 7px;
-      font-size: .78rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all .2s;
-    }
-
-    .copy-btn:hover { color: var(--text); border-color: var(--muted); }
-    .copy-btn.copied { color: #86efac; border-color: #22c55e88; }
-
-    .caption-body {
-      padding: 16px 18px;
-      min-height: 70px;
+    .caption-platform {
       display: flex;
       align-items: center;
-      justify-content: center;
-    }
-
-    .caption-text {
-      font-size: .88rem;
-      line-height: 1.75;
-      color: var(--text);
-      white-space: pre-wrap;
-      word-break: break-word;
-      width: 100%;
-    }
-
-    .caption-ph { color: var(--muted); font-size: .85rem; }
-
-    .share-row {
-      display: none;
       gap: 8px;
-      padding: 0 18px 14px;
     }
 
-    .share-btn {
-      flex: 1;
-      padding: 8px;
-      border: none;
-      border-radius: 8px;
-      font-size: .8rem;
+    .cap-icon {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #fff;
+    }
+
+    .cap-name { font-size: .88rem; font-weight: 600; }
+    .cap-chars { font-size: .73rem; color: rgba(255,255,255,.4); }
+
+    .cap-actions { display: flex; gap: 8px; }
+
+    .cap-btn {
+      padding: 5px 12px;
+      border-radius: 7px;
+      font-size: .75rem;
       font-weight: 600;
       cursor: pointer;
-      color: #fff;
+      border: none;
       transition: all .2s;
     }
 
-    .share-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    .s-li { background: #0a66c2; }
-    .s-ig { background: #dd2a7b; }
-    .s-fb { background: #1877f2; }
+    .btn-copy {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.15);
+      color: rgba(255,255,255,.7);
+    }
 
+    .btn-copy:hover { background: rgba(255,255,255,.14); color: #fff; }
+    .btn-copy.copied { border-color: rgba(255,255,255,.4); color: #fff; }
+
+    .btn-edit {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.15);
+      color: rgba(255,255,255,.7);
+    }
+    .btn-edit:hover { background: rgba(255,255,255,.1); color: #fff; }
+    .btn-edit.active { border-color: rgba(255,255,255,.5); color: #fff; background: rgba(255,255,255,.1); }
+
+    .btn-regen {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.15);
+      color: rgba(255,255,255,.7);
+    }
+    .btn-regen:hover { background: rgba(255,255,255,.1); color: #fff; }
+    .btn-regen:disabled { opacity: .4; cursor: not-allowed; }
+
+    .caption-textarea {
+      width: 100%;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: .85rem;
+      line-height: 1.75;
+      color: rgba(255,255,255,.9);
+      resize: vertical;
+      min-height: 120px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color .2s;
+    }
+    .caption-textarea:focus { border-color: rgba(255,255,255,.5); }
+
+    .btn-post {
+      color: #fff;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.3);
+      backdrop-filter: blur(4px);
+    }
+
+    .btn-post-li, .btn-post-ig, .btn-post-fb { background: rgba(255,255,255,.05); }
+    .btn-post:hover { background: rgba(255,255,255,.08); transform: translateY(-1px); }
+
+    .caption-text-box {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.03);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: .85rem;
+      line-height: 1.75;
+      color: rgba(255,255,255,.85);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,.03);
+      margin: 18px 0;
+    }
+
+    /* Skeleton */
     .skeleton {
-      background: linear-gradient(90deg, var(--card) 25%, var(--border) 50%, var(--card) 75%);
+      background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.04) 75%);
       background-size: 200% 100%;
       animation: shimmer 1.5s infinite;
       border-radius: 6px;
@@ -359,7 +396,7 @@
     @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
     .spinner {
-      width: 18px; height: 18px;
+      width: 20px; height: 20px;
       border: 2px solid rgba(255,255,255,.3);
       border-top-color: #fff;
       border-radius: 50%;
@@ -367,157 +404,298 @@
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Settings drawer ── */
+    .modal-bg {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+    }
+
+    .modal-bg.open { display: block; }
+
+    /* blur the page content when drawer is open */
+    .modal-bg.open ~ .page,
+    .modal-bg.open ~ .video-bg::after {
+      filter: blur(6px);
+    }
+
+    .page { transition: filter .3s; }
+
+    /* click-away backdrop (invisible) */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      background: rgba(0,0,0,.25);
+    }
+
+    .modal {
+      position: absolute;
+      top: 0; right: 0;
+      height: 100%;
+      width: 320px;
+      max-width: 85vw;
+      background: rgba(255,255,255,.04);
+      border-left: 1px solid rgba(255,255,255,.15);
+      border-radius: 0;
+      padding: 30px 26px;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: -8px 0 40px rgba(0,0,0,.25), inset 1px 0 0 rgba(255,255,255,.08);
+      transform: translateX(100%);
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+      overflow-y: auto;
+    }
+
+    .modal-bg.open .modal {
+      transform: translateX(0);
+    }
+
+    .modal-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.5);
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    .modal label {
+      display: block;
+      font-size: .75rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.45);
+      margin-bottom: 6px;
+    }
+
+    .modal input {
+      width: 100%;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.55);
+      border-radius: 10px;
+      color: #fff;
+      font-size: .9rem;
+      padding: 11px 16px;
+      outline: none;
+      margin-bottom: 16px;
+      transition: all .25s;
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.6),
+        inset 0 -1px 0 rgba(255,255,255,.1),
+        0 2px 12px rgba(0,0,0,.12);
+    }
+
+    .modal input::placeholder { color: rgba(255,255,255,.45); }
+
+    .modal input:focus {
+      background: rgba(255,255,255,.09);
+      border-color: rgba(255,255,255,.7);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.7),
+        0 0 0 2px rgba(255,255,255,.1),
+        0 2px 12px rgba(0,0,0,.12);
+    }
+
+    .modal-hint {
+      font-size: .78rem;
+      color: rgba(255,255,255,.35);
+      margin-top: -10px;
+      margin-bottom: 16px;
+    }
+
+    .modal-hint a { color: rgba(255,255,255,.7); text-decoration: underline; }
+
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+
+    .btn-modal-cancel {
+      background: none;
+      border: 1px solid rgba(255,255,255,.15);
+      color: rgba(255,255,255,.6);
+      padding: 9px 20px;
+      border-radius: 9px;
+      font-size: .85rem;
+      cursor: pointer;
+    }
+
+    .btn-modal-save {
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.4);
+      color: #fff;
+      padding: 9px 24px;
+      border-radius: 9px;
+      font-size: .85rem;
+      font-weight: 700;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+      transition: background .2s;
+    }
+
+    .btn-modal-save:hover { background: rgba(255,255,255,.1); }
+
     input[type="file"] { display: none; }
   </style>
 </head>
 <body>
 
-<!-- API Key Modal -->
+<!-- Video background -->
+<div class="video-bg">
+  <video autoplay muted loop playsinline>
+    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" type="video/mp4" />
+  </video>
+</div>
+
+<!-- Settings button -->
+<button class="settings-btn" onclick="openModal()" title="Settings">&#9881;</button>
+
+<!-- Settings modal -->
 <div class="modal-bg" id="modal">
+  <div class="modal-backdrop" onclick="closeModal()"></div>
   <div class="modal">
-    <h2>&#128273; Groq API Key</h2>
-    <p>Your key is saved in your browser only — never sent anywhere except directly to Groq.<br>
-      Get a free key at <a href="https://console.groq.com" target="_blank" style="color:#818cf8;">console.groq.com</a></p>
+    <div class="modal-title">
+      Settings
+      <button class="modal-close" onclick="closeModal()">&#10005;</button>
+    </div>
+
+    <label>Groq API Key</label>
     <input type="password" id="key-input" placeholder="gsk_..." />
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-save" onclick="saveKey()">Save Key</button>
+    <div class="modal-hint">Free key at <a href="https://console.groq.com" target="_blank">console.groq.com</a> — saved in your browser only</div>
+
+    <div class="modal-footer">
+      <button class="btn-modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-modal-save" onclick="saveKey()">Save</button>
     </div>
   </div>
 </div>
 
-<nav>
-  <div class="logo">&#10022; PostAI</div>
-  <button class="api-key-btn" id="key-btn" onclick="openModal()">&#128273; Set API Key</button>
-</nav>
+<!-- Page -->
+<div class="page">
 
-<main>
+  <header>
+    <div class="logo">&#10022; PostAI</div>
+    <div class="tagline">Upload an image — get captions ready to post</div>
+  </header>
 
-  <!-- Left: Upload -->
-  <div class="upload-panel">
-    <div class="panel-header">Upload Your Image</div>
+  <!-- Main card -->
+  <div class="card">
 
-    <div class="drop-zone" id="drop-zone"
+    <!-- Upload zone -->
+    <div class="upload-zone" id="upload-zone"
       onclick="document.getElementById('file-input').click()"
       ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
-      <div class="drop-icon">&#128247;</div>
-      <div class="drop-text">Drag & drop your image here</div>
-      <div class="drop-sub">JPG, PNG, WEBP — max 10MB</div>
-      <button class="browse-btn" onclick="event.stopPropagation();document.getElementById('file-input').click()">
+      <div class="upload-icon">&#128247;</div>
+      <div class="upload-text">Drag & drop your image here</div>
+      <div class="upload-sub">JPG, PNG, WEBP — max 10MB</div>
+      <button class="browse-btn" onclick="event.stopPropagation(); document.getElementById('file-input').click()">
         Browse Gallery
       </button>
     </div>
 
     <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" onchange="onFileSelect(event)" />
 
-    <div class="preview-box" id="preview-box">
+    <!-- Preview -->
+    <div class="preview-area" id="preview-area">
       <img id="preview-img" src="" alt="Preview" />
-      <button class="change-btn" onclick="changeImage()">&#9998; Change</button>
+      <button class="change-img-btn" onclick="changeImage()">&#9998; Change</button>
     </div>
 
-    <button class="generate-btn" id="gen-btn" onclick="generateCaptions()">
+    <!-- Platforms -->
+    <div class="section-label">Target Platforms</div>
+    <div class="platforms">
+      <label class="platform-pill selected" id="pill-linkedin">
+        <input type="checkbox" checked onchange="togglePill(this,'pill-linkedin')" />
+        <div class="pill-icon li-icon">in</div>
+        <span class="pill-name">LinkedIn</span>
+        <span class="pill-check">✓</span>
+      </label>
+      <label class="platform-pill selected" id="pill-instagram">
+        <input type="checkbox" checked onchange="togglePill(this,'pill-instagram')" />
+        <div class="pill-icon ig-icon">&#128247;</div>
+        <span class="pill-name">Instagram</span>
+        <span class="pill-check">✓</span>
+      </label>
+      <label class="platform-pill selected" id="pill-facebook">
+        <input type="checkbox" checked onchange="togglePill(this,'pill-facebook')" />
+        <div class="pill-icon fb-icon">f</div>
+        <span class="pill-name">Facebook</span>
+        <span class="pill-check">✓</span>
+      </label>
+    </div>
+
+    <!-- Generate -->
+    <button class="gen-btn" id="gen-btn" onclick="generateCaptions()">
       <span id="btn-text">&#9889;&nbsp; Generate Captions</span>
     </button>
 
     <div id="status" class="status"></div>
   </div>
 
-  <!-- Right: Captions -->
-  <div class="captions-panel">
-
-    <div class="caption-card">
-      <div class="caption-card-header">
-        <div class="platform-info">
-          <div class="platform-icon icon-li">in</div>
-          <div>
-            <div class="platform-name">LinkedIn</div>
-            <div class="platform-chars" id="chars-linkedin">Professional tone</div>
-          </div>
-        </div>
-        <button class="copy-btn" id="copy-linkedin" onclick="copyCaption('linkedin')">&#128203; Copy</button>
-      </div>
-      <div class="caption-body" id="body-linkedin">
-        <div class="caption-ph">LinkedIn caption will appear here</div>
-      </div>
-      <div class="share-row" id="share-linkedin">
-        <button class="share-btn s-li" onclick="openPlatform('https://www.linkedin.com/feed/','linkedin')">Open LinkedIn</button>
-      </div>
-    </div>
-
-    <div class="caption-card">
-      <div class="caption-card-header">
-        <div class="platform-info">
-          <div class="platform-icon icon-ig">&#128247;</div>
-          <div>
-            <div class="platform-name">Instagram</div>
-            <div class="platform-chars" id="chars-instagram">Engaging tone</div>
-          </div>
-        </div>
-        <button class="copy-btn" id="copy-instagram" onclick="copyCaption('instagram')">&#128203; Copy</button>
-      </div>
-      <div class="caption-body" id="body-instagram">
-        <div class="caption-ph">Instagram caption will appear here</div>
-      </div>
-      <div class="share-row" id="share-instagram">
-        <button class="share-btn s-ig" onclick="openPlatform('https://www.instagram.com/','instagram')">Open Instagram</button>
-      </div>
-    </div>
-
-    <div class="caption-card">
-      <div class="caption-card-header">
-        <div class="platform-info">
-          <div class="platform-icon icon-fb">f</div>
-          <div>
-            <div class="platform-name">Facebook</div>
-            <div class="platform-chars" id="chars-facebook">Conversational tone</div>
-          </div>
-        </div>
-        <button class="copy-btn" id="copy-facebook" onclick="copyCaption('facebook')">&#128203; Copy</button>
-      </div>
-      <div class="caption-body" id="body-facebook">
-        <div class="caption-ph">Facebook caption will appear here</div>
-      </div>
-      <div class="share-row" id="share-facebook">
-        <button class="share-btn s-fb" onclick="openPlatform('https://www.facebook.com/','facebook')">Open Facebook</button>
-      </div>
-    </div>
-
+  <!-- Output -->
+  <div class="output-card" id="output-card">
+    <div id="captions-output"></div>
   </div>
-</main>
+
+</div>
 
 <script>
   let imageB64 = "", imageType = "jpeg", captions = {};
 
-  // ── API Key ────────────────────────────────────────────────────────────────
+  const platforms = {
+    linkedin:  { name: "LinkedIn",  icon: "in", cls: "li-icon", btnCls: "btn-post-li", url: "https://www.linkedin.com/feed/" },
+    instagram: { name: "Instagram", icon: "&#128247;", cls: "ig-icon", btnCls: "btn-post-ig", url: "https://www.instagram.com/" },
+    facebook:  { name: "Facebook",  icon: "f",  cls: "fb-icon", btnCls: "btn-post-fb", url: "https://www.facebook.com/" },
+  };
+
+  // ── Settings ──────────────────────────────────────────────────────────────
   function openModal() {
-    const k = localStorage.getItem("groq_key") || "";
-    document.getElementById("key-input").value = k;
+    document.getElementById("key-input").value = localStorage.getItem("groq_key") || "";
     document.getElementById("modal").classList.add("open");
+    document.querySelector(".page").style.filter = "blur(6px)";
   }
 
-  function closeModal() { document.getElementById("modal").classList.remove("open"); }
+  function closeModal() {
+    document.getElementById("modal").classList.remove("open");
+    document.querySelector(".page").style.filter = "";
+  }
 
   function saveKey() {
     const k = document.getElementById("key-input").value.trim();
-    if (!k) return;
-    localStorage.setItem("groq_key", k);
-    updateKeyBtn(true);
+    if (k) localStorage.setItem("groq_key", k);
     closeModal();
   }
 
-  function updateKeyBtn(isSet) {
-    const btn = document.getElementById("key-btn");
-    btn.textContent = isSet ? "&#128273; Key saved ✓" : "&#128273; Set API Key";
-    btn.className = "api-key-btn" + (isSet ? " key-set" : "");
+  // ── Platform pills ────────────────────────────────────────────────────────
+  function togglePill(cb, id) {
+    document.getElementById(id).classList.toggle("selected", cb.checked);
+  }
+
+  function selectedPlatforms() {
+    return ["linkedin","instagram","facebook"].filter(p =>
+      document.querySelector(`#pill-${p} input`).checked
+    );
   }
 
   // ── File handling ─────────────────────────────────────────────────────────
   function onFileSelect(e) { if (e.target.files[0]) loadFile(e.target.files[0]); }
-  function onDragOver(e) { e.preventDefault(); document.getElementById("drop-zone").classList.add("drag-over"); }
-  function onDragLeave() { document.getElementById("drop-zone").classList.remove("drag-over"); }
+  function onDragOver(e)   { e.preventDefault(); document.getElementById("upload-zone").classList.add("drag-over"); }
+  function onDragLeave()   { document.getElementById("upload-zone").classList.remove("drag-over"); }
   function onDrop(e) {
     e.preventDefault();
-    document.getElementById("drop-zone").classList.remove("drag-over");
+    document.getElementById("upload-zone").classList.remove("drag-over");
     if (e.dataTransfer.files[0]?.type.startsWith("image/")) loadFile(e.dataTransfer.files[0]);
   }
 
@@ -528,9 +706,8 @@
     const reader = new FileReader();
     reader.onload = e => {
       document.getElementById("preview-img").src = e.target.result;
-      document.getElementById("drop-zone").style.display = "none";
-      document.getElementById("preview-box").style.display = "block";
-      document.getElementById("gen-btn").style.display = "flex";
+      document.getElementById("upload-zone").style.display = "none";
+      document.getElementById("preview-area").style.display = "block";
       setStatus("", "");
       imageB64 = e.target.result.split(",")[1];
       if (file.size > 1.5 * 1024 * 1024) compressImage(e.target.result);
@@ -538,7 +715,7 @@
     reader.readAsDataURL(file);
   }
 
-  function compressImage(dataUrl) {
+  function compressImage(src) {
     const img = new Image();
     img.onload = () => {
       const c = document.createElement("canvas");
@@ -548,30 +725,40 @@
       imageB64 = c.toDataURL("image/jpeg", 0.85).split(",")[1];
       imageType = "jpeg";
     };
-    img.src = dataUrl;
+    img.src = src;
   }
 
   function changeImage() {
-    document.getElementById("drop-zone").style.display = "flex";
-    document.getElementById("preview-box").style.display = "none";
-    document.getElementById("gen-btn").style.display = "none";
+    document.getElementById("upload-zone").style.display = "flex";
+    document.getElementById("preview-area").style.display = "none";
     document.getElementById("file-input").value = "";
+    document.getElementById("output-card").style.display = "none";
     imageB64 = ""; captions = {};
-    resetCaptions(); setStatus("", "");
+    setStatus("", "");
   }
 
-  // ── Generate captions ──────────────────────────────────────────────────────
+  // ── Generate ──────────────────────────────────────────────────────────────
   async function generateCaptions() {
     const key = localStorage.getItem("groq_key");
     if (!key) { openModal(); return; }
-    if (!imageB64) return;
+    if (!imageB64) { setStatus("Please upload an image first.", "error"); return; }
+
+    const selected = selectedPlatforms();
+    if (!selected.length) { setStatus("Select at least one platform.", "error"); return; }
 
     const btn = document.getElementById("gen-btn");
-    const btnTxt = document.getElementById("btn-text");
     btn.disabled = true;
-    btnTxt.innerHTML = '<div class="spinner"></div> Analyzing…';
+    document.getElementById("btn-text").innerHTML = '<div class="spinner"></div> Analyzing image…';
     setStatus("Groq Vision is reading your image…", "info");
-    showSkeletons();
+    showSkeletons(selected);
+
+    const platformRules = {
+      linkedin:  "Professional tone. Insightful opening. 2-3 short paragraphs. 5-7 hashtags. Max 1200 chars.",
+      instagram: "Fun and visual with relevant emojis. Conversational. 20-25 hashtags. Max 2000 chars.",
+      facebook:  "Friendly and conversational. Ask a question at the end to get comments. 3-5 hashtags. Max 500 chars."
+    };
+
+    const rules = selected.map(p => `- "${p}": ${platformRules[p]}`).join("\n");
 
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -580,18 +767,20 @@
         body: JSON.stringify({
           model: "meta-llama/llama-4-scout-17b-16e-instruct",
           temperature: 0.8,
-          max_tokens: 1500,
+          max_tokens: 1800,
           response_format: { type: "json_object" },
           messages: [{
             role: "user",
             content: [
               { type: "image_url", image_url: { url: `data:image/${imageType};base64,${imageB64}` } },
-              { type: "text", text: `Look at this image and write social media captions for it.
-Return JSON with exactly these 3 keys:
-- "linkedin": Professional tone. Insightful opening. 2-3 paragraphs. 5-7 hashtags. Max 1200 chars.
-- "instagram": Fun, visual, with emojis. Conversational. 20-25 hashtags. Max 2000 chars.
-- "facebook": Friendly and conversational. Ask a question at the end. 3-5 hashtags. Max 500 chars.
-Base everything on what you see in the image. Make it feel natural and specific, not generic.` }
+              { type: "text", text: `Look at this image carefully and write social media captions for it.
+
+Return JSON with these keys: ${selected.map(p => `"${p}"`).join(", ")}
+
+Rules:
+${rules}
+
+Make each caption feel natural, specific to what's in the image, and not generic.` }
             ]
           }]
         })
@@ -603,52 +792,149 @@ Base everything on what you see in the image. Make it feel natural and specific,
       }
 
       const data = await res.json();
-      let raw = data.choices[0].message.content.trim();
-      raw = raw.replace(/^```json|^```|```$/gm, "").trim();
+      let raw = data.choices[0].message.content.trim().replace(/^```json|^```|```$/gm,"").trim();
       captions = JSON.parse(raw);
-      showCaptions(captions);
+      showCaptions(selected);
       setStatus("✅ Captions ready! Copy and post.", "ok");
 
     } catch (e) {
-      resetCaptions();
+      document.getElementById("output-card").style.display = "none";
       setStatus("❌ " + e.message, "error");
     } finally {
       btn.disabled = false;
-      btnTxt.innerHTML = "&#9889;&nbsp; Generate Captions";
+      document.getElementById("btn-text").innerHTML = "&#9889;&nbsp; Generate Captions";
     }
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  function showSkeletons() {
-    ["linkedin","instagram","facebook"].forEach(p => {
-      document.getElementById("body-" + p).innerHTML = `<div style="width:100%">
-        <div class="skeleton" style="width:88%"></div>
-        <div class="skeleton" style="width:72%"></div>
-        <div class="skeleton" style="width:80%"></div>
-        <div class="skeleton" style="width:55%"></div>
-      </div>`;
-    });
+  // ── Output ────────────────────────────────────────────────────────────────
+  function showSkeletons(selected) {
+    const out = document.getElementById("output-card");
+    out.style.display = "block";
+    out.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    document.getElementById("captions-output").innerHTML = selected.map((p, i) => `
+      ${i > 0 ? '<div class="divider"></div>' : ''}
+      <div id="block-${p}">
+        <div class="caption-header">
+          <div class="caption-platform">
+            <div class="cap-icon ${platforms[p].cls}">${platforms[p].icon}</div>
+            <div>
+              <div class="cap-name">${platforms[p].name}</div>
+            </div>
+          </div>
+        </div>
+        <div class="caption-text-box">
+          <div class="skeleton" style="width:90%"></div>
+          <div class="skeleton" style="width:75%"></div>
+          <div class="skeleton" style="width:82%"></div>
+          <div class="skeleton" style="width:60%"></div>
+        </div>
+      </div>`).join("");
   }
 
-  function showCaptions(data) {
-    ["linkedin","instagram","facebook"].forEach(p => {
-      const text = data[p] || "";
-      document.getElementById("body-" + p).innerHTML =
-        `<div class="caption-text">${escHtml(text)}</div>`;
-      document.getElementById("chars-" + p).textContent = text.length + " chars";
-      document.getElementById("share-" + p).style.display = "flex";
-    });
+  function showCaptions(selected) {
+    document.getElementById("captions-output").innerHTML = selected.map((p, i) => {
+      const text = captions[p] || "";
+      const pl = platforms[p];
+      return `
+        ${i > 0 ? '<div class="divider"></div>' : ''}
+        <div id="block-${p}">
+          <div class="caption-header">
+            <div class="caption-platform">
+              <div class="cap-icon ${pl.cls}">${pl.icon}</div>
+              <div>
+                <div class="cap-name">${pl.name}</div>
+                <div class="cap-chars" id="chars-${p}">${text.length} chars</div>
+              </div>
+            </div>
+            <div class="cap-actions">
+              <button class="cap-btn btn-copy" id="copy-${p}" onclick="copyCaption('${p}')">&#128203; Copy</button>
+              <button class="cap-btn btn-edit" id="edit-${p}" onclick="toggleEdit('${p}')">&#9998; Edit</button>
+              <button class="cap-btn btn-regen" id="regen-${p}" onclick="regenCaption('${p}')">&#8635; Redo</button>
+              <button class="cap-btn btn-post ${pl.btnCls}" onclick="openPlatform('${pl.url}','${p}')">Post &#8599;</button>
+            </div>
+          </div>
+          <div class="caption-text-box" id="text-${p}">${escHtml(text)}</div>
+          <textarea class="caption-textarea" id="ta-${p}" style="display:none"
+            oninput="onEditInput('${p}')">${escHtml(text)}</textarea>
+        </div>`;
+    }).join("");
   }
 
-  function resetCaptions() {
-    ["linkedin","instagram","facebook"].forEach(p => {
-      document.getElementById("body-" + p).innerHTML =
-        `<div class="caption-ph">${p.charAt(0).toUpperCase()+p.slice(1)} caption will appear here</div>`;
-      document.getElementById("share-" + p).style.display = "none";
-    });
+  function toggleEdit(p) {
+    const box = document.getElementById("text-" + p);
+    const ta  = document.getElementById("ta-" + p);
+    const btn = document.getElementById("edit-" + p);
+    const editing = ta.style.display !== "none";
+    if (editing) {
+      // save
+      captions[p] = ta.value;
+      box.textContent = ta.value;
+      ta.style.display = "none";
+      box.style.display = "block";
+      btn.innerHTML = "&#9998; Edit";
+      btn.classList.remove("active");
+      document.getElementById("chars-" + p).textContent = ta.value.length + " chars";
+    } else {
+      ta.value = captions[p] || "";
+      ta.style.display = "block";
+      box.style.display = "none";
+      btn.innerHTML = "&#10003; Done";
+      btn.classList.add("active");
+    }
   }
 
-  // ── Copy & Share ──────────────────────────────────────────────────────────
+  function onEditInput(p) {
+    document.getElementById("chars-" + p).textContent = document.getElementById("ta-" + p).value.length + " chars";
+  }
+
+  async function regenCaption(p) {
+    const key = localStorage.getItem("groq_key");
+    if (!key) { openModal(); return; }
+    if (!imageB64) return;
+
+    const btn = document.getElementById("regen-" + p);
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;border-width:1.5px"></div>';
+
+    const platformRules = {
+      linkedin:  "Professional tone. Insightful opening. 2-3 short paragraphs. 5-7 hashtags. Max 1200 chars.",
+      instagram: "Fun and visual with relevant emojis. Conversational. 20-25 hashtags. Max 2000 chars.",
+      facebook:  "Friendly and conversational. Ask a question at the end to get comments. 3-5 hashtags. Max 500 chars."
+    };
+
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "meta-llama/llama-4-scout-17b-16e-instruct",
+          temperature: 0.9,
+          max_tokens: 600,
+          response_format: { type: "json_object" },
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: `data:image/${imageType};base64,${imageB64}` } },
+              { type: "text", text: `Write a fresh ${p} caption for this image. Different from before.\n\nRule: ${platformRules[p]}\n\nReturn JSON: {"${p}": "caption here"}` }
+            ]
+          }]
+        })
+      });
+      const data = await res.json();
+      const raw = JSON.parse(data.choices[0].message.content.trim().replace(/^```json|^```|```$/gm,"").trim());
+      captions[p] = raw[p] || raw[Object.keys(raw)[0]];
+      document.getElementById("text-" + p).textContent = captions[p];
+      document.getElementById("ta-" + p).value = captions[p];
+      document.getElementById("chars-" + p).textContent = captions[p].length + " chars";
+    } catch(e) {
+      console.error(e);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "&#8635; Redo";
+    }
+  }
+
   function copyCaption(p) {
     if (!captions[p]) return;
     navigator.clipboard.writeText(captions[p]).then(() => {
@@ -664,7 +950,6 @@ Base everything on what you see in the image. Make it feel natural and specific,
     window.open(url, "_blank");
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
   function setStatus(msg, type) {
     const el = document.getElementById("status");
     el.textContent = msg;
@@ -677,9 +962,7 @@ Base everything on what you see in the image. Make it feel natural and specific,
 
   // Init
   window.onload = () => {
-    const k = localStorage.getItem("groq_key");
-    if (k) updateKeyBtn(true);
-    else setTimeout(openModal, 500);
+    if (!localStorage.getItem("groq_key")) setTimeout(openModal, 600);
   };
 </script>
 

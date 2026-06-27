@@ -115,13 +115,13 @@
 
 <div class="top-bar">
   <div class="social-btns">
-    <!-- LinkedIn -->
+    <!-- LinkedIn via Zapier -->
     <div class="soc-wrap">
-      <button class="soc-btn li" id="li-btn" onclick="linkedinConnect()">
+      <button class="soc-btn li connected" id="li-btn" style="cursor:default">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+        <span class="soc-dot"></span>
         <span id="li-btn-text">LinkedIn</span>
       </button>
-      <button class="soc-disconnect" id="li-disconnect" style="display:none" onclick="linkedinDisconnect()">disconnect</button>
     </div>
     <!-- Facebook & Instagram -->
     <div class="soc-wrap">
@@ -201,10 +201,7 @@ function openModal(){document.getElementById("key-input").value=localStorage.get
 function closeModal(){document.getElementById("modal").classList.remove("open");document.querySelector(".page").style.filter=""}
 function saveSettings(){var k=document.getElementById("key-input").value.trim();if(k)localStorage.setItem("groq_key",k);closeModal()}
 
-/* ── LinkedIn OAuth ── */
-async function linkedinConnect(){try{var cfg=await fetch("/.netlify/functions/linkedin-config");var json=await cfg.json();var cid=json.clientId;if(!cid){showToast("LinkedIn Client ID not set in Netlify env vars");return}var ru=encodeURIComponent(window.location.origin+"/.netlify/functions/linkedin-auth");var sc=encodeURIComponent("openid profile w_member_social");var st=Math.random().toString(36).substring(2);localStorage.setItem("li_state",st);window.location.href="https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id="+cid+"&redirect_uri="+ru+"&scope="+sc+"&state="+st}catch(e){showToast("Could not reach server. Are you on Netlify?")}}
-function linkedinDisconnect(){localStorage.removeItem("li_token");updateLiUI();showToast("LinkedIn disconnected")}
-function updateLiUI(){var t=localStorage.getItem("li_token");var btn=document.getElementById("li-btn");var disc=document.getElementById("li-disconnect");var txt=document.getElementById("li-btn-text");if(t){btn.classList.add("connected");txt.textContent="LinkedIn ✓";disc.style.display="inline";btn.onclick=null}else{btn.classList.remove("connected");txt.textContent="LinkedIn";disc.style.display="none";btn.onclick=linkedinConnect}}
+/* ── LinkedIn via Zapier (no OAuth needed) ── */
 
 /* ── Facebook & Instagram OAuth ── */
 async function facebookConnect(){try{var cfg=await fetch("/.netlify/functions/facebook-config");var json=await cfg.json();var appId=json.appId;if(!appId){showToast("Facebook App ID not set in Netlify env vars");return}var ru=encodeURIComponent(window.location.origin+"/.netlify/functions/facebook-auth");var sc=encodeURIComponent("pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish");var st=Math.random().toString(36).substring(2);localStorage.setItem("fb_state",st);window.location.href="https://www.facebook.com/v19.0/dialog/oauth?client_id="+appId+"&redirect_uri="+ru+"&scope="+sc+"&state="+st}catch(e){showToast("Could not reach server. Are you on Netlify?")}}
@@ -215,8 +212,7 @@ function updateFbUI(){var t=localStorage.getItem("fb_token");var btn=document.ge
 function handleOAuthReturn(){
   var h=window.location.hash;
   var p=new URLSearchParams(h.replace("#",""));
-  /* LinkedIn */
-  if(p.get("li_token")){localStorage.setItem("li_token",decodeURIComponent(p.get("li_token")));history.replaceState(null,"",window.location.pathname);updateLiUI();showToast("LinkedIn connected! Upload an image to auto-post.")}
+  /* LinkedIn handled via Zapier */
   /* Facebook & Instagram */
   if(p.get("fb_token")){
     localStorage.setItem("fb_token",decodeURIComponent(p.get("fb_token")));
@@ -230,12 +226,12 @@ function handleOAuthReturn(){
   }
   /* Errors */
   var s=new URLSearchParams(window.location.search);
-  if(s.get("li_error")){showToast("LinkedIn error: "+s.get("li_error"));history.replaceState(null,"",window.location.pathname)}
+
   if(s.get("fb_error")){var e=s.get("fb_error");if(e==="no_pages")e="No Facebook Pages found. Create a Page first.";showToast("Facebook error: "+e);history.replaceState(null,"",window.location.pathname)}
 }
 
-/* ── Post to LinkedIn ── */
-async function postToLinkedIn(caption){var token=localStorage.getItem("li_token");if(!token||!imageB64)return;showToast("Posting to LinkedIn...");try{var res=await fetch("/.netlify/functions/linkedin-post",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:token,caption:caption,imageBase64:imageB64,imageType:imageType})});var data=await res.json();if(data.success){showToast("Posted to LinkedIn! ✓")}else if(data.error&&data.error.indexOf("Invalid token")!==-1){localStorage.removeItem("li_token");updateLiUI();showToast("LinkedIn session expired - please reconnect")}else{showToast("LinkedIn failed: "+(data.error||"unknown"))}}catch(err){showToast("LinkedIn error: "+err.message)}}
+/* ── Post to LinkedIn via Zapier ── */
+async function postToLinkedIn(caption){if(!imageB64)return;showToast("Posting to LinkedIn...");try{var res=await fetch("/.netlify/functions/zapier-linkedin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({caption:caption,imageBase64:imageB64})});var data=await res.json();if(data.success){showToast("Posted to LinkedIn! ✓")}else{showToast("LinkedIn failed: "+(data.error||"unknown"))}}catch(err){showToast("LinkedIn error: "+err.message)}}
 
 /* ── Post to Facebook ── */
 async function postToFacebook(caption){var token=localStorage.getItem("fb_token");var pageId=localStorage.getItem("fb_page_id");if(!token||!pageId||!imageB64)return;showToast("Posting to Facebook...");try{var res=await fetch("/.netlify/functions/facebook-post",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pageToken:token,pageId:pageId,caption:caption,imageBase64:imageB64,imageType:imageType})});var data=await res.json();if(data.success){showToast("Posted to Facebook! ✓")}else{showToast("Facebook failed: "+(data.error||"unknown"))}}catch(err){showToast("Facebook error: "+err.message)}}
@@ -259,7 +255,7 @@ function changeImage(){document.getElementById("upload-zone").style.display="fle
 /* ── Generate captions ── */
 async function generateCaptions(){var key=localStorage.getItem("groq_key");if(!key){openModal();return}if(!imageB64){setStatus("Please upload an image first.","error");return}var sel=selectedPlatforms();if(!sel.length){setStatus("Select at least one platform.","error");return}var btn=document.getElementById("gen-btn");btn.disabled=true;document.getElementById("btn-text").innerHTML='<div class="spinner"></div>';setStatus("Groq Vision is analysing your image...","info");showSkeletons(sel);var rules={linkedin:"Professional tone. Insightful opening. 2-3 short paragraphs. 5-7 hashtags. Max 1200 chars.",instagram:"Fun and visual with emojis. Conversational. 20-25 hashtags. Max 2000 chars.",facebook:"Friendly and conversational. Ask a question at the end. 3-5 hashtags. Max 500 chars."};var rt=sel.map(function(p){return'"'+p+'": '+rules[p]}).join("\n");try{var res=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},body:JSON.stringify({model:"meta-llama/llama-4-scout-17b-16e-instruct",temperature:.8,max_tokens:1800,response_format:{type:"json_object"},messages:[{role:"user",content:[{type:"image_url",image_url:{url:"data:image/"+imageType+";base64,"+imageB64}},{type:"text",text:"Write social media captions for this image.\n\nReturn JSON with keys: "+sel.map(function(p){return'"'+p+'"'}).join(", ")+"\n\nRules:\n"+rt+"\n\nMake each caption specific to the image."}]}]})});if(!res.ok){var er=await res.json().catch(function(){return{}});throw new Error((er.error&&er.error.message)||("Groq error "+res.status))}var data=await res.json();var raw=data.choices[0].message.content.trim().replace(/^```json|^```|```$/gm,"").trim();captions=JSON.parse(raw);showCaptions(sel);setStatus("Captions ready!","ok");
 /* Auto-post to connected platforms */
-if(sel.indexOf("linkedin")!==-1&&localStorage.getItem("li_token")&&captions.linkedin){postToLinkedIn(captions.linkedin)}
+if(sel.indexOf("linkedin")!==-1&&captions.linkedin){postToLinkedIn(captions.linkedin)}
 if(sel.indexOf("facebook")!==-1&&localStorage.getItem("fb_token")&&localStorage.getItem("fb_page_id")&&captions.facebook){postToFacebook(captions.facebook)}
 if(sel.indexOf("instagram")!==-1&&localStorage.getItem("fb_token")&&localStorage.getItem("fb_ig_id")&&captions.instagram){postToInstagram(captions.instagram)}
 }catch(e){document.getElementById("output-card").style.display="none";setStatus("Error: "+e.message,"error")}finally{btn.disabled=false;document.getElementById("btn-text").innerHTML="&#9889;&nbsp; Generate &amp; Post"}}
@@ -268,7 +264,7 @@ if(sel.indexOf("instagram")!==-1&&localStorage.getItem("fb_token")&&localStorage
 function showSkeletons(sel){var out=document.getElementById("output-card");out.style.display="block";out.scrollIntoView({behavior:"smooth",block:"nearest"});document.getElementById("captions-output").innerHTML=sel.map(function(p,i){var pl=platforms[p];return(i>0?'<div class="divider"></div>':'')+'<div id="block-'+p+'"><div class="caption-header"><div class="caption-platform"><div class="cap-icon">'+pl.icon+'</div><div><div class="cap-name">'+pl.name+'</div></div></div></div><div class="caption-text-box"><div class="skeleton" style="width:90%"></div><div class="skeleton" style="width:75%"></div><div class="skeleton" style="width:82%"></div><div class="skeleton" style="width:60%"></div></div></div>'}).join("")}
 
 /* ── Show captions ── */
-function showCaptions(sel){document.getElementById("captions-output").innerHTML=sel.map(function(p,i){var text=captions[p]||"";var pl=platforms[p];var liOk=p==="linkedin"&&!!localStorage.getItem("li_token");var fbOk=p==="facebook"&&!!localStorage.getItem("fb_token")&&!!localStorage.getItem("fb_page_id");var igOk=p==="instagram"&&!!localStorage.getItem("fb_token")&&!!localStorage.getItem("fb_ig_id");var postBtn;if(liOk)postBtn='<button class="cap-btn btn-post-li" onclick="postToLinkedIn(captions[\''+p+'\'])">&#128279; Post</button>';else if(fbOk)postBtn='<button class="cap-btn btn-post-fb" onclick="postToFacebook(captions[\''+p+'\'])">&#128279; Post</button>';else if(igOk)postBtn='<button class="cap-btn btn-post-ig" onclick="postToInstagram(captions[\''+p+'\'])">&#128279; Post</button>';else postBtn='<button class="cap-btn" onclick="sharePost(\''+p+'\')">Post &#8599;</button>';return(i>0?'<div class="divider"></div>':'')+'<div id="block-'+p+'"><div class="caption-header"><div class="caption-platform"><div class="cap-icon">'+pl.icon+'</div><div><div class="cap-name">'+pl.name+'</div><div class="cap-chars" id="chars-'+p+'">'+text.length+' chars</div></div></div><div class="cap-actions"><button class="cap-btn btn-copy" id="copy-'+p+'" onclick="copyCaption(\''+p+'\')">&#128203; Copy</button><button class="cap-btn btn-edit" id="edit-'+p+'" onclick="toggleEdit(\''+p+'\')">&#9998; Edit</button><button class="cap-btn" id="regen-'+p+'" onclick="regenCaption(\''+p+'\')">&#8635; Redo</button>'+postBtn+'</div></div><div class="caption-text-box" id="text-'+p+'">'+escHtml(text)+'</div><textarea class="caption-textarea" id="ta-'+p+'" style="display:none" oninput="onEditInput(\''+p+'\')">'+escHtml(text)+'</textarea></div>'}).join("")}
+function showCaptions(sel){document.getElementById("captions-output").innerHTML=sel.map(function(p,i){var text=captions[p]||"";var pl=platforms[p];var liOk=p==="linkedin";var fbOk=p==="facebook"&&!!localStorage.getItem("fb_token")&&!!localStorage.getItem("fb_page_id");var igOk=p==="instagram"&&!!localStorage.getItem("fb_token")&&!!localStorage.getItem("fb_ig_id");var postBtn;if(liOk)postBtn='<button class="cap-btn btn-post-li" onclick="postToLinkedIn(captions[\''+p+'\'])">&#128279; Post</button>';else if(fbOk)postBtn='<button class="cap-btn btn-post-fb" onclick="postToFacebook(captions[\''+p+'\'])">&#128279; Post</button>';else if(igOk)postBtn='<button class="cap-btn btn-post-ig" onclick="postToInstagram(captions[\''+p+'\'])">&#128279; Post</button>';else postBtn='<button class="cap-btn" onclick="sharePost(\''+p+'\')">Post &#8599;</button>';return(i>0?'<div class="divider"></div>':'')+'<div id="block-'+p+'"><div class="caption-header"><div class="caption-platform"><div class="cap-icon">'+pl.icon+'</div><div><div class="cap-name">'+pl.name+'</div><div class="cap-chars" id="chars-'+p+'">'+text.length+' chars</div></div></div><div class="cap-actions"><button class="cap-btn btn-copy" id="copy-'+p+'" onclick="copyCaption(\''+p+'\')">&#128203; Copy</button><button class="cap-btn btn-edit" id="edit-'+p+'" onclick="toggleEdit(\''+p+'\')">&#9998; Edit</button><button class="cap-btn" id="regen-'+p+'" onclick="regenCaption(\''+p+'\')">&#8635; Redo</button>'+postBtn+'</div></div><div class="caption-text-box" id="text-'+p+'">'+escHtml(text)+'</div><textarea class="caption-textarea" id="ta-'+p+'" style="display:none" oninput="onEditInput(\''+p+'\')">'+escHtml(text)+'</textarea></div>'}).join("")}
 
 /* ── Edit / Redo ── */
 function toggleEdit(p){var box=document.getElementById("text-"+p);var ta=document.getElementById("ta-"+p);var btn=document.getElementById("edit-"+p);var editing=ta.style.display!=="none";if(editing){captions[p]=ta.value;box.textContent=ta.value;ta.style.display="none";box.style.display="block";btn.innerHTML="&#9998; Edit";btn.classList.remove("active");document.getElementById("chars-"+p).textContent=ta.value.length+" chars"}else{ta.value=captions[p]||"";ta.style.display="block";box.style.display="none";btn.innerHTML="&#10003; Done";btn.classList.add("active")}}
@@ -288,7 +284,7 @@ function escHtml(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt
 var _tt=null;
 function showToast(msg){var el=document.getElementById("toast");el.textContent=msg;el.classList.add("show");if(_tt)clearTimeout(_tt);_tt=setTimeout(function(){el.classList.remove("show")},3500)}
 
-window.onload=function(){handleOAuthReturn();updateLiUI();updateFbUI();if(!localStorage.getItem("groq_key"))setTimeout(openModal,600)};
+window.onload=function(){handleOAuthReturn();updateFbUI();if(!localStorage.getItem("groq_key"))setTimeout(openModal,600)};
 </script>
 </body>
 </html>

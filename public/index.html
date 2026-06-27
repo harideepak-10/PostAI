@@ -652,7 +652,7 @@
 </div>
 
 <script>
-  let imageB64 = "", imageType = "jpeg", captions = {};
+  let imageB64 = "", imageType = "jpeg", captions = {}, imageFile = null;
 
   const platforms = {
     linkedin:  { name: "LinkedIn",  icon: "in", cls: "li-icon", btnCls: "btn-post-li", url: "https://www.linkedin.com/feed/" },
@@ -701,6 +701,7 @@
 
   function loadFile(file) {
     if (file.size > 10 * 1024 * 1024) { setStatus("Max 10MB.", "error"); return; }
+    imageFile = file;
     imageType = file.type.includes("png") ? "png" : file.type.includes("webp") ? "webp" : "jpeg";
 
     const reader = new FileReader();
@@ -733,7 +734,7 @@
     document.getElementById("preview-area").style.display = "none";
     document.getElementById("file-input").value = "";
     document.getElementById("output-card").style.display = "none";
-    imageB64 = ""; captions = {};
+    imageB64 = ""; captions = {}; imageFile = null;
     setStatus("", "");
   }
 
@@ -945,26 +946,13 @@ Make each caption feel natural, specific to what's in the image, and not generic
     });
   }
 
-  function openPlatform(url, p) {
-    if (captions[p]) navigator.clipboard.writeText(captions[p]);
-    window.open(url, "_blank");
-  }
+  async function openPlatform(url, p) {
+    const caption = captions[p] || "";
 
-  function setStatus(msg, type) {
-    const el = document.getElementById("status");
-    el.textContent = msg;
-    el.className = type ? "status " + type : "status";
-  }
-
-  function escHtml(s) {
-    return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  }
-
-  // Init
-  window.onload = () => {
-    if (!localStorage.getItem("groq_key")) setTimeout(openModal, 600);
-  };
-</script>
-
-</body>
-</html>
+    // ── Mobile: Web Share API with image + caption ──────────────────────────
+    if (navigator.canShare && imageFile) {
+      // Build a fresh File from the stored file (needed for share)
+      const shareFile = new File([imageFile], imageFile.name, { type: imageFile.type });
+      if (navigator.canShare({ files: [shareFile], text: caption })) {
+        try {
+     

@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PostAI</title>
+  <title>PostAI — Caption Generator</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        #080810;
-      --surface:   #10101c;
-      --card:      #14142a;
-      --border:    #1e1e3a;
-      --primary:   #6366f1;
-      --primary-h: #818cf8;
-      --text:      #e2e8f0;
-      --muted:     #64748b;
-      --radius:    14px;
+      --bg:      #080810;
+      --surface: #10101c;
+      --card:    #14142a;
+      --border:  #1e1e3a;
+      --primary: #6366f1;
+      --ph:      #818cf8;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --radius:  14px;
     }
 
     body {
@@ -29,10 +29,11 @@
     nav {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       padding: 0 24px;
       height: 60px;
       border-bottom: 1px solid var(--border);
-      background: rgba(8,8,16,.9);
+      background: rgba(8,8,16,.92);
       backdrop-filter: blur(12px);
       position: sticky;
       top: 0;
@@ -47,194 +48,318 @@
       -webkit-text-fill-color: transparent;
     }
 
-    main {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 40px 20px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 32px;
-      align-items: start;
+    .api-key-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: .8rem;
+      cursor: pointer;
+      transition: all .2s;
     }
 
-    @media (max-width: 680px) {
-      main { grid-template-columns: 1fr; }
+    .api-key-btn:hover { color: var(--text); border-color: var(--muted); }
+    .api-key-btn.key-set { color: #86efac; border-color: #22c55e44; }
+
+    /* Key modal */
+    .modal-bg {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
     }
 
-    .panel {
+    .modal-bg.open { display: flex; }
+
+    .modal {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 24px;
+      padding: 28px;
+      width: 420px;
+      max-width: 90vw;
     }
 
-    .panel-title {
-      font-size: .75rem;
-      font-weight: 600;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 16px;
-    }
+    .modal h2 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+    .modal p  { font-size: .83rem; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
 
-    textarea {
+    .modal input {
       width: 100%;
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 9px;
       color: var(--text);
-      font-size: .95rem;
-      padding: 14px 16px;
-      resize: none;
+      font-size: .9rem;
+      padding: 11px 14px;
       outline: none;
-      line-height: 1.6;
+      margin-bottom: 12px;
       transition: border-color .2s;
     }
 
-    textarea:focus { border-color: var(--primary); }
-    textarea::placeholder { color: var(--muted); }
+    .modal input:focus { border-color: var(--primary); }
 
-    .btn {
+    .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+
+    .btn-cancel {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: .85rem;
+      cursor: pointer;
+    }
+
+    .btn-save {
+      background: var(--primary);
+      border: none;
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-save:hover { background: var(--ph); }
+
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 36px 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    @media (max-width: 780px) { main { grid-template-columns: 1fr; } }
+
+    /* ── Upload ── */
+    .upload-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .drop-zone {
+      margin: 20px;
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 40px 20px;
       display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .2s;
+      text-align: center;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--primary);
+      background: rgba(99,102,241,.05);
+      color: var(--ph);
+    }
+
+    .drop-icon { font-size: 2.5rem; opacity: .5; }
+    .drop-text { font-size: .9rem; }
+    .drop-sub  { font-size: .78rem; opacity: .6; }
+
+    .browse-btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .browse-btn:hover { background: var(--ph); }
+
+    .preview-box {
+      display: none;
+      margin: 0 20px 16px;
+      position: relative;
+    }
+
+    .preview-box img {
+      width: 100%;
+      border-radius: 10px;
+      max-height: 360px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .change-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,.75);
+      color: #fff;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: .78rem;
+      cursor: pointer;
+    }
+
+    .generate-btn {
+      display: none;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      width: 100%;
-      padding: 13px 20px;
+      width: calc(100% - 40px);
+      margin: 0 20px 20px;
+      padding: 13px;
+      background: var(--primary);
+      color: #fff;
       border: none;
       border-radius: 10px;
       font-size: .95rem;
       font-weight: 600;
       cursor: pointer;
       transition: all .2s;
-      margin-top: 12px;
-      background: var(--primary);
-      color: #fff;
     }
 
-    .btn:hover { background: var(--primary-h); transform: translateY(-1px); }
-    .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    .generate-btn:hover { background: var(--ph); transform: translateY(-1px); }
+    .generate-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
     .status {
       display: none;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: .85rem;
-      margin-top: 12px;
+      margin: 0 20px 16px;
+      padding: 10px 13px;
+      border-radius: 9px;
+      font-size: .83rem;
       line-height: 1.5;
     }
 
-    .status.info  { display: block; background: rgba(99,102,241,.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,.3); }
-    .status.error { display: block; background: rgba(239,68,68,.12); color: #fca5a5; border: 1px solid rgba(239,68,68,.25); }
-    .status.ok    { display: block; background: rgba(34,197,94,.12); color: #86efac; border: 1px solid rgba(34,197,94,.25); }
+    .status.info  { display:block; background:rgba(99,102,241,.15); color:#a5b4fc; border:1px solid rgba(99,102,241,.3); }
+    .status.error { display:block; background:rgba(239,68,68,.12); color:#fca5a5; border:1px solid rgba(239,68,68,.25); }
+    .status.ok    { display:block; background:rgba(34,197,94,.12); color:#86efac; border:1px solid rgba(34,197,94,.25); }
 
-    /* Captions */
-    .captions-section { display: none; margin-top: 16px; }
+    /* ── Caption cards ── */
+    .captions-panel { display: flex; flex-direction: column; gap: 16px; }
 
-    .caption-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+    .caption-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
 
-    .caption-tab {
+    .caption-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .platform-info { display: flex; align-items: center; gap: 10px; }
+
+    .platform-icon {
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+
+    .icon-li { background: #0a66c2; }
+    .icon-ig { background: linear-gradient(135deg,#f58529,#dd2a7b,#8134af); }
+    .icon-fb { background: #1877f2; }
+
+    .platform-name  { font-size: .9rem; font-weight: 600; }
+    .platform-chars { font-size: .75rem; color: var(--muted); }
+
+    .copy-btn {
       background: var(--card);
       border: 1px solid var(--border);
       color: var(--muted);
-      padding: 5px 12px;
-      border-radius: 6px;
-      font-size: .8rem;
-      cursor: pointer;
-      transition: all .2s;
-    }
-
-    .caption-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
-
-    .caption-row {
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: 6px;
-    }
-
-    .copy-btn {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      padding: 4px 10px;
-      border-radius: 6px;
+      padding: 6px 13px;
+      border-radius: 7px;
       font-size: .78rem;
+      font-weight: 500;
       cursor: pointer;
       transition: all .2s;
     }
 
     .copy-btn:hover { color: var(--text); border-color: var(--muted); }
+    .copy-btn.copied { color: #86efac; border-color: #22c55e88; }
 
-    .caption-content {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
-      font-size: .85rem;
-      line-height: 1.7;
+    .caption-body {
+      padding: 16px 18px;
+      min-height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .caption-text {
+      font-size: .88rem;
+      line-height: 1.75;
       color: var(--text);
       white-space: pre-wrap;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-
-    /* Image preview */
-    .image-box {
-      background: var(--card);
-      border: 1px dashed var(--border);
-      border-radius: var(--radius);
-      aspect-ratio: 4/5;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      gap: 12px;
-      color: var(--muted);
-      font-size: .9rem;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .image-box img {
+      word-break: break-word;
       width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: var(--radius);
+    }
+
+    .caption-ph { color: var(--muted); font-size: .85rem; }
+
+    .share-row {
+      display: none;
+      gap: 8px;
+      padding: 0 18px 14px;
+    }
+
+    .share-btn {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 8px;
+      font-size: .8rem;
+      font-weight: 600;
       cursor: pointer;
-      transition: transform .3s;
+      color: #fff;
+      transition: all .2s;
     }
 
-    .image-box img:hover { transform: scale(1.02); }
-    .placeholder-icon { font-size: 2.5rem; opacity: .25; }
+    .share-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .s-li { background: #0a66c2; }
+    .s-ig { background: #dd2a7b; }
+    .s-fb { background: #1877f2; }
 
-    .image-loading {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-      background: rgba(10,10,20,.85);
-      border-radius: var(--radius);
-      color: var(--muted);
-      font-size: .85rem;
+    .skeleton {
+      background: linear-gradient(90deg, var(--card) 25%, var(--border) 50%, var(--card) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px;
+      height: 13px;
+      margin-bottom: 8px;
     }
 
-    .pulse-ring {
-      width: 52px; height: 52px;
-      border: 3px solid var(--primary);
-      border-radius: 50%;
-      animation: pulse 1.4s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%   { transform: scale(.8); opacity: 1; }
-      100% { transform: scale(1.6); opacity: 0; }
-    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
     .spinner {
-      width: 20px; height: 20px;
+      width: 18px; height: 18px;
       border: 2px solid rgba(255,255,255,.3);
       border-top-color: #fff;
       border-radius: 50%;
@@ -242,174 +367,320 @@
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    .open-link {
-      display: block;
-      text-align: center;
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: .82rem;
-      text-decoration: none;
-    }
-
-    .open-link:hover { color: var(--primary-h); }
+    input[type="file"] { display: none; }
   </style>
 </head>
 <body>
 
+<!-- API Key Modal -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h2>&#128273; Groq API Key</h2>
+    <p>Your key is saved in your browser only — never sent anywhere except directly to Groq.<br>
+      Get a free key at <a href="https://console.groq.com" target="_blank" style="color:#818cf8;">console.groq.com</a></p>
+    <input type="password" id="key-input" placeholder="gsk_..." />
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveKey()">Save Key</button>
+    </div>
+  </div>
+</div>
+
 <nav>
   <div class="logo">&#10022; PostAI</div>
+  <button class="api-key-btn" id="key-btn" onclick="openModal()">&#128273; Set API Key</button>
 </nav>
 
 <main>
 
-  <!-- Left: Input + Captions -->
-  <div>
-    <div class="panel">
-      <p class="panel-title">Describe your image</p>
-      <textarea id="prompt" rows="6"
-        placeholder="e.g. A futuristic electric car charging at night, neon city reflections on wet pavement, cinematic shot..."></textarea>
+  <!-- Left: Upload -->
+  <div class="upload-panel">
+    <div class="panel-header">Upload Your Image</div>
 
-      <button class="btn" id="gen-btn" onclick="generate()">
-        <span id="gen-btn-text">&#9654;&nbsp; Generate with FLUX</span>
+    <div class="drop-zone" id="drop-zone"
+      onclick="document.getElementById('file-input').click()"
+      ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <div class="drop-icon">&#128247;</div>
+      <div class="drop-text">Drag & drop your image here</div>
+      <div class="drop-sub">JPG, PNG, WEBP — max 10MB</div>
+      <button class="browse-btn" onclick="event.stopPropagation();document.getElementById('file-input').click()">
+        Browse Gallery
       </button>
-
-      <div id="status" class="status"></div>
     </div>
 
-    <div id="captions-section" class="captions-section panel">
-      <p class="panel-title">Captions</p>
-      <div class="caption-tabs" id="caption-tabs"></div>
-      <div class="caption-row">
-        <button class="copy-btn" onclick="copyCaption()">Copy</button>
+    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" onchange="onFileSelect(event)" />
+
+    <div class="preview-box" id="preview-box">
+      <img id="preview-img" src="" alt="Preview" />
+      <button class="change-btn" onclick="changeImage()">&#9998; Change</button>
+    </div>
+
+    <button class="generate-btn" id="gen-btn" onclick="generateCaptions()">
+      <span id="btn-text">&#9889;&nbsp; Generate Captions</span>
+    </button>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <!-- Right: Captions -->
+  <div class="captions-panel">
+
+    <div class="caption-card">
+      <div class="caption-card-header">
+        <div class="platform-info">
+          <div class="platform-icon icon-li">in</div>
+          <div>
+            <div class="platform-name">LinkedIn</div>
+            <div class="platform-chars" id="chars-linkedin">Professional tone</div>
+          </div>
+        </div>
+        <button class="copy-btn" id="copy-linkedin" onclick="copyCaption('linkedin')">&#128203; Copy</button>
       </div>
-      <div class="caption-content" id="caption-text"></div>
+      <div class="caption-body" id="body-linkedin">
+        <div class="caption-ph">LinkedIn caption will appear here</div>
+      </div>
+      <div class="share-row" id="share-linkedin">
+        <button class="share-btn s-li" onclick="openPlatform('https://www.linkedin.com/feed/','linkedin')">Open LinkedIn</button>
+      </div>
     </div>
-  </div>
 
-  <!-- Right: Image preview -->
-  <div class="panel" style="padding:16px;">
-    <p class="panel-title">Preview</p>
-    <div class="image-box" id="image-box">
-      <div class="placeholder-icon">&#128444;</div>
-      <span>Your image will appear here</span>
+    <div class="caption-card">
+      <div class="caption-card-header">
+        <div class="platform-info">
+          <div class="platform-icon icon-ig">&#128247;</div>
+          <div>
+            <div class="platform-name">Instagram</div>
+            <div class="platform-chars" id="chars-instagram">Engaging tone</div>
+          </div>
+        </div>
+        <button class="copy-btn" id="copy-instagram" onclick="copyCaption('instagram')">&#128203; Copy</button>
+      </div>
+      <div class="caption-body" id="body-instagram">
+        <div class="caption-ph">Instagram caption will appear here</div>
+      </div>
+      <div class="share-row" id="share-instagram">
+        <button class="share-btn s-ig" onclick="openPlatform('https://www.instagram.com/','instagram')">Open Instagram</button>
+      </div>
     </div>
-    <a id="open-link" class="open-link" href="#" target="_blank" style="display:none;">
-      &#8599; Open full size
-    </a>
-  </div>
 
+    <div class="caption-card">
+      <div class="caption-card-header">
+        <div class="platform-info">
+          <div class="platform-icon icon-fb">f</div>
+          <div>
+            <div class="platform-name">Facebook</div>
+            <div class="platform-chars" id="chars-facebook">Conversational tone</div>
+          </div>
+        </div>
+        <button class="copy-btn" id="copy-facebook" onclick="copyCaption('facebook')">&#128203; Copy</button>
+      </div>
+      <div class="caption-body" id="body-facebook">
+        <div class="caption-ph">Facebook caption will appear here</div>
+      </div>
+      <div class="share-row" id="share-facebook">
+        <button class="share-btn s-fb" onclick="openPlatform('https://www.facebook.com/','facebook')">Open Facebook</button>
+      </div>
+    </div>
+
+  </div>
 </main>
 
 <script>
-  let currentCaptions = {};
-  let activeCaptionKey = "";
+  let imageB64 = "", imageType = "jpeg", captions = {};
 
-  async function generate() {
-    const prompt = document.getElementById("prompt").value.trim();
-    if (!prompt) { setStatus("Please enter a prompt first.", "error"); return; }
+  // ── API Key ────────────────────────────────────────────────────────────────
+  function openModal() {
+    const k = localStorage.getItem("groq_key") || "";
+    document.getElementById("key-input").value = k;
+    document.getElementById("modal").classList.add("open");
+  }
 
-    const btn    = document.getElementById("gen-btn");
-    const btnTxt = document.getElementById("gen-btn-text");
-    const imgBox = document.getElementById("image-box");
+  function closeModal() { document.getElementById("modal").classList.remove("open"); }
 
-    document.getElementById("captions-section").style.display = "none";
-    document.getElementById("open-link").style.display = "none";
+  function saveKey() {
+    const k = document.getElementById("key-input").value.trim();
+    if (!k) return;
+    localStorage.setItem("groq_key", k);
+    updateKeyBtn(true);
+    closeModal();
+  }
+
+  function updateKeyBtn(isSet) {
+    const btn = document.getElementById("key-btn");
+    btn.textContent = isSet ? "&#128273; Key saved ✓" : "&#128273; Set API Key";
+    btn.className = "api-key-btn" + (isSet ? " key-set" : "");
+  }
+
+  // ── File handling ─────────────────────────────────────────────────────────
+  function onFileSelect(e) { if (e.target.files[0]) loadFile(e.target.files[0]); }
+  function onDragOver(e) { e.preventDefault(); document.getElementById("drop-zone").classList.add("drag-over"); }
+  function onDragLeave() { document.getElementById("drop-zone").classList.remove("drag-over"); }
+  function onDrop(e) {
+    e.preventDefault();
+    document.getElementById("drop-zone").classList.remove("drag-over");
+    if (e.dataTransfer.files[0]?.type.startsWith("image/")) loadFile(e.dataTransfer.files[0]);
+  }
+
+  function loadFile(file) {
+    if (file.size > 10 * 1024 * 1024) { setStatus("Max 10MB.", "error"); return; }
+    imageType = file.type.includes("png") ? "png" : file.type.includes("webp") ? "webp" : "jpeg";
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById("preview-img").src = e.target.result;
+      document.getElementById("drop-zone").style.display = "none";
+      document.getElementById("preview-box").style.display = "block";
+      document.getElementById("gen-btn").style.display = "flex";
+      setStatus("", "");
+      imageB64 = e.target.result.split(",")[1];
+      if (file.size > 1.5 * 1024 * 1024) compressImage(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function compressImage(dataUrl) {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      const scale = Math.min(1, 1024 / img.width);
+      c.width = img.width * scale; c.height = img.height * scale;
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      imageB64 = c.toDataURL("image/jpeg", 0.85).split(",")[1];
+      imageType = "jpeg";
+    };
+    img.src = dataUrl;
+  }
+
+  function changeImage() {
+    document.getElementById("drop-zone").style.display = "flex";
+    document.getElementById("preview-box").style.display = "none";
+    document.getElementById("gen-btn").style.display = "none";
+    document.getElementById("file-input").value = "";
+    imageB64 = ""; captions = {};
+    resetCaptions(); setStatus("", "");
+  }
+
+  // ── Generate captions ──────────────────────────────────────────────────────
+  async function generateCaptions() {
+    const key = localStorage.getItem("groq_key");
+    if (!key) { openModal(); return; }
+    if (!imageB64) return;
+
+    const btn = document.getElementById("gen-btn");
+    const btnTxt = document.getElementById("btn-text");
     btn.disabled = true;
-    btnTxt.innerHTML = '<div class="spinner"></div> Generating…';
-    setStatus("Sending to fal.ai FLUX — usually takes 15–30 seconds…", "info");
-
-    imgBox.innerHTML = `
-      <div class="image-loading">
-        <div class="pulse-ring"></div>
-        <span>Generating with FLUX…</span>
-      </div>`;
+    btnTxt.innerHTML = '<div class="spinner"></div> Analyzing…';
+    setStatus("Groq Vision is reading your image…", "info");
+    showSkeletons();
 
     try {
-      const res = await fetch("/api/generate", {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "meta-llama/llama-4-scout-17b-16e-instruct",
+          temperature: 0.8,
+          max_tokens: 1500,
+          response_format: { type: "json_object" },
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: `data:image/${imageType};base64,${imageB64}` } },
+              { type: "text", text: `Look at this image and write social media captions for it.
+Return JSON with exactly these 3 keys:
+- "linkedin": Professional tone. Insightful opening. 2-3 paragraphs. 5-7 hashtags. Max 1200 chars.
+- "instagram": Fun, visual, with emojis. Conversational. 20-25 hashtags. Max 2000 chars.
+- "facebook": Friendly and conversational. Ask a question at the end. 3-5 hashtags. Max 500 chars.
+Base everything on what you see in the image. Make it feel natural and specific, not generic.` }
+            ]
+          }]
+        })
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Server error " + res.status);
+        throw new Error(err.error?.message || "Groq error " + res.status);
       }
 
       const data = await res.json();
-
-      imgBox.innerHTML = `<img src="${esc(data.image_url)}" alt="Generated"
-        onclick="window.open('${esc(data.image_url)}', '_blank')"
-        title="Click to open full size" />`;
-
-      const link = document.getElementById("open-link");
-      link.href = data.image_url;
-      link.style.display = "block";
-
-      setStatus("✅ Done! Click the image to open full size.", "ok");
-
-      if (data.captions && Object.keys(data.captions).length) {
-        currentCaptions = data.captions;
-        renderCaptions();
-        document.getElementById("captions-section").style.display = "block";
-      }
+      let raw = data.choices[0].message.content.trim();
+      raw = raw.replace(/^```json|^```|```$/gm, "").trim();
+      captions = JSON.parse(raw);
+      showCaptions(captions);
+      setStatus("✅ Captions ready! Copy and post.", "ok");
 
     } catch (e) {
-      imgBox.innerHTML = `<div class="placeholder-icon">⚠️</div><span style="padding:0 16px;text-align:center;">${escHtml(e.message)}</span>`;
+      resetCaptions();
       setStatus("❌ " + e.message, "error");
     } finally {
       btn.disabled = false;
-      btnTxt.innerHTML = "&#9654;&nbsp; Generate with FLUX";
+      btnTxt.innerHTML = "&#9889;&nbsp; Generate Captions";
     }
   }
 
-  function renderCaptions() {
-    const keys = Object.keys(currentCaptions);
-    if (!keys.length) return;
-    activeCaptionKey = keys[0];
-
-    document.getElementById("caption-tabs").innerHTML = keys.map(k => `
-      <button class="caption-tab ${k === activeCaptionKey ? "active" : ""}"
-        onclick="selectCaption('${k}', this)">${k.charAt(0).toUpperCase() + k.slice(1)}</button>`
-    ).join("");
-
-    document.getElementById("caption-text").textContent = currentCaptions[activeCaptionKey] || "";
-  }
-
-  function selectCaption(key, el) {
-    document.querySelectorAll(".caption-tab").forEach(t => t.classList.remove("active"));
-    el.classList.add("active");
-    activeCaptionKey = key;
-    document.getElementById("caption-text").textContent = currentCaptions[key] || "";
-  }
-
-  function copyCaption() {
-    const text = currentCaptions[activeCaptionKey];
-    if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
-      const btn = document.querySelector(".copy-btn");
-      const old = btn.textContent;
-      btn.textContent = "Copied!";
-      setTimeout(() => btn.textContent = old, 1500);
+  // ── Render ────────────────────────────────────────────────────────────────
+  function showSkeletons() {
+    ["linkedin","instagram","facebook"].forEach(p => {
+      document.getElementById("body-" + p).innerHTML = `<div style="width:100%">
+        <div class="skeleton" style="width:88%"></div>
+        <div class="skeleton" style="width:72%"></div>
+        <div class="skeleton" style="width:80%"></div>
+        <div class="skeleton" style="width:55%"></div>
+      </div>`;
     });
   }
 
+  function showCaptions(data) {
+    ["linkedin","instagram","facebook"].forEach(p => {
+      const text = data[p] || "";
+      document.getElementById("body-" + p).innerHTML =
+        `<div class="caption-text">${escHtml(text)}</div>`;
+      document.getElementById("chars-" + p).textContent = text.length + " chars";
+      document.getElementById("share-" + p).style.display = "flex";
+    });
+  }
+
+  function resetCaptions() {
+    ["linkedin","instagram","facebook"].forEach(p => {
+      document.getElementById("body-" + p).innerHTML =
+        `<div class="caption-ph">${p.charAt(0).toUpperCase()+p.slice(1)} caption will appear here</div>`;
+      document.getElementById("share-" + p).style.display = "none";
+    });
+  }
+
+  // ── Copy & Share ──────────────────────────────────────────────────────────
+  function copyCaption(p) {
+    if (!captions[p]) return;
+    navigator.clipboard.writeText(captions[p]).then(() => {
+      const btn = document.getElementById("copy-" + p);
+      const old = btn.innerHTML;
+      btn.innerHTML = "✓ Copied!"; btn.classList.add("copied");
+      setTimeout(() => { btn.innerHTML = old; btn.classList.remove("copied"); }, 2000);
+    });
+  }
+
+  function openPlatform(url, p) {
+    if (captions[p]) navigator.clipboard.writeText(captions[p]);
+    window.open(url, "_blank");
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
   function setStatus(msg, type) {
     const el = document.getElementById("status");
     el.textContent = msg;
-    el.className = "status " + type;
+    el.className = type ? "status " + type : "status";
   }
 
-  function esc(s) {
-    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  function escHtml(s) {
+    return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
-  function escHtml(s) { return esc(s); }
-
-  document.getElementById("prompt").addEventListener("keydown", e => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) generate();
-  });
+  // Init
+  window.onload = () => {
+    const k = localStorage.getItem("groq_key");
+    if (k) updateKeyBtn(true);
+    else setTimeout(openModal, 500);
+  };
 </script>
 
 </body>

@@ -3,775 +3,292 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PostAI — AI Caption Generator</title>
+  <title>PostAI</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      min-height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: #e2e8f0;
-      overflow-x: hidden;
-    }
-
-    /* Video background */
-    .video-bg {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-    }
-    .video-bg video { width: 100%; height: 100%; object-fit: cover; }
-    .video-bg::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: rgba(4,4,16,0.25);
-    }
-
-    /* Layout */
-    .page {
-      position: relative;
-      z-index: 1;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 32px 16px 60px;
-      transition: filter .3s;
-    }
-
-    /* Header */
-    header { text-align: center; margin-bottom: 32px; }
-    .logo {
-      font-size: 1rem;
-      font-weight: 700;
-      letter-spacing: .2em;
-      color: rgba(255,255,255,.9);
-      margin-bottom: 6px;
-    }
-    .tagline { font-size: .85rem; color: rgba(255,255,255,.45); letter-spacing: .05em; }
-
-    /* Settings button */
-    .settings-btn {
-      position: fixed;
-      top: 18px; right: 20px;
-      width: 40px; height: 40px;
-      background: rgba(255,255,255,.05);
-      border: 1px solid rgba(255,255,255,.18);
-      color: rgba(255,255,255,.75);
-      border-radius: 50%;
-      font-size: 1.15rem;
-      cursor: pointer;
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      z-index: 10;
-      transition: all .25s;
-      display: flex; align-items: center; justify-content: center;
-      padding: 0;
-    }
-    .settings-btn:hover {
-      background: rgba(255,255,255,.1);
-      color: #fff;
-      border-color: rgba(255,255,255,.35);
-      transform: rotate(45deg);
-    }
-
-    /* Main card */
-    .card {
-      background: rgba(255,255,255,.03);
-      border: 1px solid rgba(255,255,255,.15);
-      border-radius: 20px;
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      padding: 32px;
-      width: 100%;
-      max-width: 600px;
-    }
-
-    /* Upload zone */
-    .upload-zone {
-      border: 2px dashed rgba(255,255,255,.2);
-      border-radius: 14px;
-      padding: 36px 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: all .2s;
-      margin-bottom: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .upload-zone:hover, .upload-zone.drag-over {
-      border-color: rgba(255,255,255,.5);
-      background: rgba(255,255,255,.04);
-    }
-    .upload-icon { font-size: 2.2rem; margin-bottom: 10px; opacity: .6; }
-    .upload-text { font-size: .9rem; color: rgba(255,255,255,.6); margin-bottom: 4px; }
-    .upload-sub  { font-size: .78rem; color: rgba(255,255,255,.35); margin-bottom: 14px; }
-    .browse-btn {
-      background: rgba(255,255,255,.07);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,.3);
-      padding: 8px 22px;
-      border-radius: 8px;
-      font-size: .85rem;
-      font-weight: 600;
-      cursor: pointer;
-      backdrop-filter: blur(4px);
-      transition: background .2s;
-    }
-    .browse-btn:hover { background: rgba(255,255,255,.15); }
-
-    /* Preview */
-    .preview-area { display: none; margin-bottom: 20px; position: relative; }
-    .preview-area img {
-      width: 100%; max-height: 320px;
-      object-fit: cover; border-radius: 12px; display: block;
-    }
-    .change-img-btn {
-      position: absolute; top: 10px; right: 10px;
-      background: rgba(0,0,0,.6);
-      color: #fff; border: none;
-      padding: 5px 13px; border-radius: 7px;
-      font-size: .78rem; cursor: pointer;
-      backdrop-filter: blur(4px);
-    }
-
-    /* Platforms */
-    .section-label {
-      font-size: .72rem; font-weight: 600;
-      letter-spacing: .1em; text-transform: uppercase;
-      color: rgba(255,255,255,.4); margin-bottom: 12px;
-    }
-    .platforms { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
-    .platform-pill {
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 16px; border-radius: 50px;
-      border: 1px solid rgba(255,255,255,.15);
-      background: rgba(255,255,255,.03);
-      cursor: pointer; transition: all .2s; user-select: none;
-    }
-    .platform-pill:hover { border-color: rgba(255,255,255,.3); }
-    .platform-pill.selected { border-color: rgba(255,255,255,.6); background: rgba(255,255,255,.05); }
-    .platform-pill input { display: none; }
-    .pill-icon {
-      width: 24px; height: 24px; border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 700; color: #fff;
-      background: rgba(255,255,255,.15);
-    }
-    .pill-name { font-size: .85rem; font-weight: 500; }
-    .pill-check { margin-left: 4px; font-size: .75rem; opacity: 0; transition: opacity .2s; color: rgba(255,255,255,.9); }
-    .platform-pill.selected .pill-check { opacity: 1; }
-
-    /* Generate button */
-    .gen-btn {
-      width: 100%; padding: 14px;
-      background: rgba(255,255,255,.07);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,.3);
-      border-radius: 12px;
-      font-size: 1rem; font-weight: 700;
-      cursor: pointer; transition: all .2s;
-      letter-spacing: .03em;
-      backdrop-filter: blur(4px);
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-    }
-    .gen-btn:hover { background: rgba(255,255,255,.13); transform: translateY(-1px); }
-    .gen-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-
-    /* Status */
-    .status { display: none; padding: 10px 14px; border-radius: 10px; font-size: .83rem; margin-top: 14px; line-height: 1.5; }
-    .status.info  { display:block; background:rgba(255,255,255,.05); color:rgba(255,255,255,.8); border:1px solid rgba(255,255,255,.2); }
-    .status.error { display:block; background:rgba(255,255,255,.04); color:rgba(255,200,200,.9); border:1px solid rgba(255,150,150,.25); }
-    .status.ok    { display:block; background:rgba(255,255,255,.05); color:rgba(200,255,200,.9); border:1px solid rgba(150,255,150,.2); }
-
-    /* Output card */
-    .output-card {
-      display: none;
-      background: rgba(255,255,255,.03);
-      border: 1px solid rgba(255,255,255,.15);
-      border-radius: 20px;
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      padding: 28px;
-      width: 100%; max-width: 600px;
-      margin-top: 20px;
-    }
-
-    .caption-header {
-      display: flex; align-items: center;
-      justify-content: space-between; margin-bottom: 10px;
-      flex-wrap: wrap; gap: 8px;
-    }
-    .caption-platform { display: flex; align-items: center; gap: 8px; }
-    .cap-icon {
-      width: 28px; height: 28px; border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 700; color: #fff;
-      background: rgba(255,255,255,.15);
-    }
-    .cap-name { font-size: .88rem; font-weight: 600; }
-    .cap-chars { font-size: .73rem; color: rgba(255,255,255,.4); }
-    .cap-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-
-    .cap-btn {
-      padding: 5px 11px; border-radius: 7px;
-      font-size: .74rem; font-weight: 600;
-      cursor: pointer; transition: all .2s;
-      background: rgba(255,255,255,.05);
-      border: 1px solid rgba(255,255,255,.15);
-      color: rgba(255,255,255,.7);
-    }
-    .cap-btn:hover { background: rgba(255,255,255,.12); color: #fff; }
-    .cap-btn:disabled { opacity: .4; cursor: not-allowed; }
-    .btn-copy.copied { border-color: rgba(200,255,200,.4); color: rgba(200,255,200,.9); }
-    .btn-edit.active { border-color: rgba(255,255,255,.5); color: #fff; background: rgba(255,255,255,.1); }
-
-    .caption-text-box {
-      background: rgba(255,255,255,.03);
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius: 10px; padding: 14px 16px;
-      font-size: .85rem; line-height: 1.75;
-      color: rgba(255,255,255,.85);
-      white-space: pre-wrap; word-break: break-word;
-    }
-    .caption-textarea {
-      width: 100%;
-      background: rgba(255,255,255,.04);
-      border: 1px solid rgba(255,255,255,.25);
-      border-radius: 10px; padding: 14px 16px;
-      font-size: .85rem; line-height: 1.75;
-      color: rgba(255,255,255,.9);
-      resize: vertical; min-height: 120px;
-      outline: none; font-family: inherit;
-      transition: border-color .2s;
-    }
-    .caption-textarea:focus { border-color: rgba(255,255,255,.5); }
-
-    .divider { height: 1px; background: rgba(255,255,255,.07); margin: 18px 0; }
-
-    /* Skeleton */
-    .skeleton {
-      background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.04) 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.5s infinite;
-      border-radius: 6px; height: 13px; margin-bottom: 8px;
-    }
-    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-
-    .spinner {
-      width: 20px; height: 20px;
-      border: 2px solid rgba(255,255,255,.3);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      display: inline-block;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Settings drawer */
-    .modal-bg {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 200;
-    }
-    .modal-bg.open { display: block; }
-    .modal-backdrop {
-      position: absolute; inset: 0;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      background: rgba(0,0,0,.25);
-    }
-    .modal {
-      position: absolute;
-      top: 0; right: 0;
-      height: 100%; width: 320px; max-width: 85vw;
-      background: rgba(255,255,255,.04);
-      border-left: 1px solid rgba(255,255,255,.15);
-      padding: 30px 26px;
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      box-shadow: -8px 0 40px rgba(0,0,0,.25);
-      transform: translateX(100%);
-      transition: transform .3s cubic-bezier(.4,0,.2,1);
-      overflow-y: auto;
-    }
-    .modal-bg.open .modal { transform: translateX(0); }
-
-    .modal-title {
-      font-size: 1rem; font-weight: 700; margin-bottom: 24px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .modal-close {
-      background: none; border: none;
-      color: rgba(255,255,255,.5); font-size: 1.2rem; cursor: pointer;
-    }
-    .modal label {
-      display: block; font-size: .73rem; font-weight: 600;
-      letter-spacing: .08em; text-transform: uppercase;
-      color: rgba(255,255,255,.45); margin-bottom: 6px;
-    }
-    .modal input {
-      width: 100%;
-      background: rgba(255,255,255,.06);
-      border: 1px solid rgba(255,255,255,.55);
-      border-radius: 10px; color: #fff;
-      font-size: .9rem; padding: 11px 16px;
-      outline: none; margin-bottom: 6px;
-      transition: all .25s;
-      backdrop-filter: blur(2px);
-      -webkit-backdrop-filter: blur(2px);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 2px 12px rgba(0,0,0,.12);
-    }
-    .modal input::placeholder { color: rgba(255,255,255,.4); }
-    .modal input:focus {
-      border-color: rgba(255,255,255,.7);
-      background: rgba(255,255,255,.09);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 0 0 2px rgba(255,255,255,.1);
-    }
-    .modal-hint { font-size: .75rem; color: rgba(255,255,255,.35); margin-bottom: 20px; }
-    .modal-hint a { color: rgba(255,255,255,.65); }
-
-    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
-    .btn-modal-cancel {
-      background: none; border: 1px solid rgba(255,255,255,.15);
-      color: rgba(255,255,255,.6); padding: 9px 20px;
-      border-radius: 9px; font-size: .85rem; cursor: pointer;
-    }
-    .btn-modal-save {
-      background: rgba(255,255,255,.1);
-      border: 1px solid rgba(255,255,255,.35);
-      color: #fff; padding: 9px 24px;
-      border-radius: 9px; font-size: .85rem; font-weight: 700;
-      cursor: pointer; backdrop-filter: blur(4px); transition: background .2s;
-    }
-    .btn-modal-save:hover { background: rgba(255,255,255,.18); }
-
-    input[type="file"] { display: none; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e2e8f0;overflow-x:hidden}
+    .video-bg{position:fixed;inset:0;z-index:0}
+    .video-bg video{width:100%;height:100%;object-fit:cover}
+    .video-bg::after{content:'';position:absolute;inset:0;background:rgba(4,4,16,.25)}
+    .page{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:80px 16px 60px;transition:filter .3s}
+    header{text-align:center;margin-bottom:24px}
+    .logo{font-size:1rem;font-weight:700;letter-spacing:.2em;color:rgba(255,255,255,.9);margin-bottom:6px}
+    .tagline{font-size:.82rem;color:rgba(255,255,255,.45)}
+    .top-bar{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);gap:8px}
+    .social-btns{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .soc-wrap{display:flex;align-items:center;gap:5px}
+    .soc-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;color:#fff;font-size:.74rem;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s;white-space:nowrap;border:1px solid}
+    .soc-btn.li{background:rgba(10,102,194,.2);border-color:rgba(10,102,194,.55)}
+    .soc-btn.li:hover{background:rgba(10,102,194,.4)}
+    .soc-btn.li.connected{background:rgba(10,102,194,.12);border-color:rgba(10,102,194,.35);cursor:default}
+    .soc-btn.fb{background:rgba(24,119,242,.15);border-color:rgba(24,119,242,.5)}
+    .soc-btn.fb:hover{background:rgba(24,119,242,.35)}
+    .soc-btn.fb.connected{background:rgba(24,119,242,.1);border-color:rgba(24,119,242,.3);cursor:default}
+    .soc-dot{width:6px;height:6px;border-radius:50%;background:#5cb85c;flex-shrink:0}
+    .soc-disconnect{background:none;border:none;color:rgba(255,255,255,.3);font-size:.68rem;cursor:pointer;text-decoration:underline}
+    .soc-disconnect:hover{color:rgba(255,255,255,.6)}
+    .settings-btn{width:34px;height:34px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.75);border-radius:50%;font-size:1rem;cursor:pointer;backdrop-filter:blur(4px);transition:all .25s;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}
+    .settings-btn:hover{background:rgba(255,255,255,.1);color:#fff;transform:rotate(45deg)}
+    .card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.15);border-radius:20px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);padding:26px;width:100%;max-width:600px}
+    .upload-zone{border:2px dashed rgba(255,255,255,.2);border-radius:14px;padding:30px 20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:18px;display:flex;flex-direction:column;align-items:center}
+    .upload-zone:hover,.upload-zone.drag-over{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.04)}
+    .upload-icon{font-size:2rem;margin-bottom:8px;opacity:.6}
+    .upload-text{font-size:.86rem;color:rgba(255,255,255,.6);margin-bottom:4px}
+    .upload-sub{font-size:.74rem;color:rgba(255,255,255,.35);margin-bottom:12px}
+    .browse-btn{background:rgba(255,255,255,.07);color:#fff;border:1px solid rgba(255,255,255,.3);padding:7px 18px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;transition:background .2s}
+    .browse-btn:hover{background:rgba(255,255,255,.15)}
+    .preview-area{display:none;margin-bottom:18px;position:relative}
+    .preview-area img{width:100%;max-height:280px;object-fit:cover;border-radius:12px;display:block}
+    .change-img-btn{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.6);color:#fff;border:none;padding:5px 12px;border-radius:7px;font-size:.74rem;cursor:pointer;backdrop-filter:blur(4px)}
+    .section-label{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:10px}
+    .platforms{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+    .platform-pill{display:flex;align-items:center;gap:7px;padding:7px 13px;border-radius:50px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.03);cursor:pointer;transition:all .2s;user-select:none}
+    .platform-pill:hover{border-color:rgba(255,255,255,.3)}
+    .platform-pill.selected{border-color:rgba(255,255,255,.6);background:rgba(255,255,255,.05)}
+    .platform-pill input{display:none}
+    .pill-icon{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;background:rgba(255,255,255,.15)}
+    .pill-name{font-size:.82rem;font-weight:500}
+    .pill-check{margin-left:3px;font-size:.72rem;opacity:0;transition:opacity .2s;color:rgba(255,255,255,.9)}
+    .platform-pill.selected .pill-check{opacity:1}
+    .gen-btn{width:100%;padding:13px;background:rgba(255,255,255,.07);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:12px;font-size:.95rem;font-weight:700;cursor:pointer;transition:all .2s;backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;gap:10px}
+    .gen-btn:hover{background:rgba(255,255,255,.13);transform:translateY(-1px)}
+    .gen-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    .status{display:none;padding:10px 14px;border-radius:10px;font-size:.82rem;margin-top:12px;line-height:1.5}
+    .status.info{display:block;background:rgba(255,255,255,.05);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.2)}
+    .status.error{display:block;background:rgba(255,255,255,.04);color:rgba(255,200,200,.9);border:1px solid rgba(255,150,150,.25)}
+    .status.ok{display:block;background:rgba(255,255,255,.05);color:rgba(200,255,200,.9);border:1px solid rgba(150,255,150,.2)}
+    .output-card{display:none;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.15);border-radius:20px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);padding:22px;width:100%;max-width:600px;margin-top:14px}
+    .caption-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+    .caption-platform{display:flex;align-items:center;gap:8px}
+    .cap-icon{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;background:rgba(255,255,255,.15)}
+    .cap-name{font-size:.85rem;font-weight:600}
+    .cap-chars{font-size:.7rem;color:rgba(255,255,255,.4)}
+    .cap-actions{display:flex;gap:5px;flex-wrap:wrap}
+    .cap-btn{padding:5px 10px;border-radius:7px;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
+    .cap-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+    .cap-btn:disabled{opacity:.4;cursor:not-allowed}
+    .btn-copy.copied{border-color:rgba(200,255,200,.4);color:rgba(200,255,200,.9)}
+    .btn-edit.active{border-color:rgba(255,255,255,.5);color:#fff;background:rgba(255,255,255,.1)}
+    .btn-post-li{border-color:rgba(10,102,194,.5);color:rgba(150,190,255,.9)}
+    .btn-post-li:hover{background:rgba(10,102,194,.2)}
+    .btn-post-fb{border-color:rgba(24,119,242,.5);color:rgba(130,180,255,.9)}
+    .btn-post-fb:hover{background:rgba(24,119,242,.2)}
+    .btn-post-ig{border-color:rgba(193,53,132,.5);color:rgba(255,160,210,.9)}
+    .btn-post-ig:hover{background:rgba(193,53,132,.2)}
+    .caption-text-box{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:13px 15px;font-size:.83rem;line-height:1.75;color:rgba(255,255,255,.85);white-space:pre-wrap;word-break:break-word}
+    .caption-textarea{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:13px 15px;font-size:.83rem;line-height:1.75;color:rgba(255,255,255,.9);resize:vertical;min-height:120px;outline:none;font-family:inherit;transition:border-color .2s}
+    .caption-textarea:focus{border-color:rgba(255,255,255,.5)}
+    .divider{height:1px;background:rgba(255,255,255,.07);margin:16px 0}
+    .skeleton{background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.09) 50%,rgba(255,255,255,.04) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;height:12px;margin-bottom:8px}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    .spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);background:rgba(20,20,35,.92);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:12px 20px;font-size:.82rem;color:#fff;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);z-index:999;transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .35s;opacity:0;max-width:90vw;text-align:center}
+    .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+    .modal-bg{display:none;position:fixed;inset:0;z-index:200}
+    .modal-bg.open{display:block}
+    .modal-backdrop{position:absolute;inset:0;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(0,0,0,.25)}
+    .modal{position:absolute;top:0;right:0;height:100%;width:320px;max-width:85vw;background:rgba(255,255,255,.04);border-left:1px solid rgba(255,255,255,.15);padding:26px 22px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:-8px 0 40px rgba(0,0,0,.25);transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);overflow-y:auto}
+    .modal-bg.open .modal{transform:translateX(0)}
+    .modal-title{font-size:.95rem;font-weight:700;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
+    .modal-close{background:none;border:none;color:rgba(255,255,255,.5);font-size:1.2rem;cursor:pointer}
+    .modal label{display:block;font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:5px}
+    .modal input{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.5);border-radius:10px;color:#fff;font-size:.88rem;padding:10px 13px;outline:none;margin-bottom:5px;transition:all .2s;box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
+    .modal input::placeholder{color:rgba(255,255,255,.4)}
+    .modal input:focus{border-color:rgba(255,255,255,.7);background:rgba(255,255,255,.09)}
+    .modal-hint{font-size:.72rem;color:rgba(255,255,255,.35);margin-bottom:16px}
+    .modal-hint a{color:rgba(255,255,255,.6)}
+    .modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+    .btn-modal-cancel{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:8px 16px;border-radius:9px;font-size:.82rem;cursor:pointer}
+    .btn-modal-save{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.35);color:#fff;padding:8px 20px;border-radius:9px;font-size:.82rem;font-weight:700;cursor:pointer;transition:background .2s}
+    .btn-modal-save:hover{background:rgba(255,255,255,.18)}
+    input[type="file"]{display:none}
+    @media(max-width:600px){.card,.output-card{padding:16px 13px}.cap-btn{padding:6px 8px;font-size:.7rem}.soc-btn span{display:none}.soc-btn{padding:6px 10px}}
   </style>
 </head>
 <body>
-
-<!-- Video background -->
 <div class="video-bg">
   <video autoplay muted loop playsinline>
-    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" type="video/mp4" />
+    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" type="video/mp4"/>
   </video>
 </div>
 
-<!-- Settings button -->
-<button class="settings-btn" onclick="openModal()" title="Settings">&#9881;</button>
+<div class="top-bar">
+  <div class="social-btns">
+    <!-- LinkedIn -->
+    <div class="soc-wrap">
+      <button class="soc-btn li" id="li-btn" onclick="linkedinConnect()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+        <span id="li-btn-text">LinkedIn</span>
+      </button>
+      <button class="soc-disconnect" id="li-disconnect" style="display:none" onclick="linkedinDisconnect()">disconnect</button>
+    </div>
+    <!-- Facebook & Instagram -->
+    <div class="soc-wrap">
+      <button class="soc-btn fb" id="fb-btn" onclick="facebookConnect()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff" style="margin-left:-2px"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+        <span id="fb-btn-text">Facebook &amp; Instagram</span>
+      </button>
+      <button class="soc-disconnect" id="fb-disconnect" style="display:none" onclick="facebookDisconnect()">disconnect</button>
+    </div>
+  </div>
+  <button class="settings-btn" onclick="openModal()" title="Settings">&#9881;</button>
+</div>
 
-<!-- Settings drawer -->
+<div class="toast" id="toast"></div>
+
 <div class="modal-bg" id="modal">
   <div class="modal-backdrop" onclick="closeModal()"></div>
   <div class="modal">
-    <div class="modal-title">
-      Settings
-      <button class="modal-close" onclick="closeModal()">&#10005;</button>
-    </div>
+    <div class="modal-title">Settings<button class="modal-close" onclick="closeModal()">&#10005;</button></div>
     <label>Groq API Key</label>
-    <input type="password" id="key-input" placeholder="gsk_..." />
-    <div class="modal-hint">Free key at <a href="https://console.groq.com" target="_blank">console.groq.com</a> — stored in your browser only</div>
+    <input type="password" id="key-input" placeholder="gsk_..."/>
+    <div class="modal-hint">Free at <a href="https://console.groq.com" target="_blank">console.groq.com</a></div>
     <div class="modal-footer">
       <button class="btn-modal-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-modal-save" onclick="saveKey()">Save</button>
+      <button class="btn-modal-save" onclick="saveSettings()">Save</button>
     </div>
   </div>
 </div>
 
-<!-- Page -->
 <div class="page">
-
   <header>
     <div class="logo">&#10022; PostAI</div>
-    <div class="tagline">Upload an image — get captions ready to post</div>
+    <div class="tagline">Upload &rarr; Generate &rarr; Auto-post</div>
   </header>
-
-  <!-- Main card -->
   <div class="card">
-
-    <!-- Upload zone -->
-    <div class="upload-zone" id="upload-zone"
-      onclick="document.getElementById('file-input').click()"
-      ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
       <div class="upload-icon">&#128247;</div>
       <div class="upload-text">Drag &amp; drop your image here</div>
-      <div class="upload-sub">JPG, PNG, WEBP — max 10MB</div>
-      <button class="browse-btn" onclick="event.stopPropagation(); document.getElementById('file-input').click()">
-        Browse Gallery
-      </button>
+      <div class="upload-sub">JPG, PNG, WEBP &mdash; max 10MB</div>
+      <button class="browse-btn" onclick="event.stopPropagation();document.getElementById('file-input').click()">Browse Gallery</button>
     </div>
-
-    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" onchange="onFileSelect(event)" />
-
-    <!-- Preview -->
+    <input type="file" id="file-input" accept="image/*" onchange="onFileSelect(event)"/>
     <div class="preview-area" id="preview-area">
-      <img id="preview-img" src="" alt="Preview" />
+      <img id="preview-img" src="" alt="Preview"/>
       <button class="change-img-btn" onclick="changeImage()">&#9998; Change</button>
     </div>
-
-    <!-- Platforms -->
     <div class="section-label">Target Platforms</div>
     <div class="platforms">
       <label class="platform-pill selected" id="pill-linkedin">
-        <input type="checkbox" checked onchange="togglePill(this,'pill-linkedin')" />
-        <div class="pill-icon">in</div>
-        <span class="pill-name">LinkedIn</span>
-        <span class="pill-check">&#10003;</span>
+        <input type="checkbox" checked onchange="togglePill(this,'pill-linkedin')"/>
+        <div class="pill-icon">in</div><span class="pill-name">LinkedIn</span><span class="pill-check">&#10003;</span>
       </label>
       <label class="platform-pill selected" id="pill-instagram">
-        <input type="checkbox" checked onchange="togglePill(this,'pill-instagram')" />
-        <div class="pill-icon">&#128247;</div>
-        <span class="pill-name">Instagram</span>
-        <span class="pill-check">&#10003;</span>
+        <input type="checkbox" checked onchange="togglePill(this,'pill-instagram')"/>
+        <div class="pill-icon">&#128247;</div><span class="pill-name">Instagram</span><span class="pill-check">&#10003;</span>
       </label>
       <label class="platform-pill selected" id="pill-facebook">
-        <input type="checkbox" checked onchange="togglePill(this,'pill-facebook')" />
-        <div class="pill-icon">f</div>
-        <span class="pill-name">Facebook</span>
-        <span class="pill-check">&#10003;</span>
+        <input type="checkbox" checked onchange="togglePill(this,'pill-facebook')"/>
+        <div class="pill-icon">f</div><span class="pill-name">Facebook</span><span class="pill-check">&#10003;</span>
       </label>
     </div>
-
-    <!-- Generate -->
     <button class="gen-btn" id="gen-btn" onclick="generateCaptions()">
-      <span id="btn-text">&#9889;&nbsp; Generate Captions</span>
+      <span id="btn-text">&#9889;&nbsp; Generate &amp; Post</span>
     </button>
-
     <div id="status" class="status"></div>
   </div>
-
-  <!-- Output -->
-  <div class="output-card" id="output-card">
-    <div id="captions-output"></div>
-  </div>
-
+  <div class="output-card" id="output-card"><div id="captions-output"></div></div>
 </div>
 
 <script>
-  let imageB64 = "", imageType = "jpeg", captions = {}, imageFile = null;
+var imageB64="",imageType="jpeg",captions={},imageFile=null;
+var platforms={linkedin:{name:"LinkedIn",icon:"in",url:"https://www.linkedin.com/feed/"},instagram:{name:"Instagram",icon:"IG",url:"https://www.instagram.com/"},facebook:{name:"Facebook",icon:"f",url:"https://www.facebook.com/"}};
 
-  const platforms = {
-    linkedin:  { name: "LinkedIn",  icon: "in", url: "https://www.linkedin.com/feed/" },
-    instagram: { name: "Instagram", icon: "📷", url: "https://www.instagram.com/" },
-    facebook:  { name: "Facebook",  icon: "f",  url: "https://www.facebook.com/" }
-  };
+/* ── Settings ── */
+function openModal(){document.getElementById("key-input").value=localStorage.getItem("groq_key")||"";document.getElementById("modal").classList.add("open");document.querySelector(".page").style.filter="blur(6px)"}
+function closeModal(){document.getElementById("modal").classList.remove("open");document.querySelector(".page").style.filter=""}
+function saveSettings(){var k=document.getElementById("key-input").value.trim();if(k)localStorage.setItem("groq_key",k);closeModal()}
 
-  // Settings
-  function openModal() {
-    document.getElementById("key-input").value = localStorage.getItem("groq_key") || "";
-    document.getElementById("modal").classList.add("open");
-    document.querySelector(".page").style.filter = "blur(6px)";
+/* ── LinkedIn OAuth ── */
+async function linkedinConnect(){try{var cfg=await fetch("/.netlify/functions/linkedin-config");var json=await cfg.json();var cid=json.clientId;if(!cid){showToast("LinkedIn Client ID not set in Netlify env vars");return}var ru=encodeURIComponent(window.location.origin+"/.netlify/functions/linkedin-auth");var sc=encodeURIComponent("openid profile w_member_social");var st=Math.random().toString(36).substring(2);localStorage.setItem("li_state",st);window.location.href="https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id="+cid+"&redirect_uri="+ru+"&scope="+sc+"&state="+st}catch(e){showToast("Could not reach server. Are you on Netlify?")}}
+function linkedinDisconnect(){localStorage.removeItem("li_token");updateLiUI();showToast("LinkedIn disconnected")}
+function updateLiUI(){var t=localStorage.getItem("li_token");var btn=document.getElementById("li-btn");var disc=document.getElementById("li-disconnect");var txt=document.getElementById("li-btn-text");if(t){btn.classList.add("connected");txt.textContent="LinkedIn ✓";disc.style.display="inline";btn.onclick=null}else{btn.classList.remove("connected");txt.textContent="LinkedIn";disc.style.display="none";btn.onclick=linkedinConnect}}
+
+/* ── Facebook & Instagram OAuth ── */
+async function facebookConnect(){try{var cfg=await fetch("/.netlify/functions/facebook-config");var json=await cfg.json();var appId=json.appId;if(!appId){showToast("Facebook App ID not set in Netlify env vars");return}var ru=encodeURIComponent(window.location.origin+"/.netlify/functions/facebook-auth");var sc=encodeURIComponent("pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish");var st=Math.random().toString(36).substring(2);localStorage.setItem("fb_state",st);window.location.href="https://www.facebook.com/v19.0/dialog/oauth?client_id="+appId+"&redirect_uri="+ru+"&scope="+sc+"&state="+st}catch(e){showToast("Could not reach server. Are you on Netlify?")}}
+function facebookDisconnect(){localStorage.removeItem("fb_token");localStorage.removeItem("fb_page_id");localStorage.removeItem("fb_ig_id");updateFbUI();showToast("Facebook & Instagram disconnected")}
+function updateFbUI(){var t=localStorage.getItem("fb_token");var btn=document.getElementById("fb-btn");var disc=document.getElementById("fb-disconnect");var txt=document.getElementById("fb-btn-text");var hasIg=!!localStorage.getItem("fb_ig_id");if(t){btn.classList.add("connected");txt.textContent=(hasIg?"FB & IG":"Facebook")+" ✓";disc.style.display="inline";btn.onclick=null}else{btn.classList.remove("connected");txt.textContent="Facebook & Instagram";disc.style.display="none";btn.onclick=facebookConnect}}
+
+/* ── Handle OAuth returns ── */
+function handleOAuthReturn(){
+  var h=window.location.hash;
+  var p=new URLSearchParams(h.replace("#",""));
+  /* LinkedIn */
+  if(p.get("li_token")){localStorage.setItem("li_token",decodeURIComponent(p.get("li_token")));history.replaceState(null,"",window.location.pathname);updateLiUI();showToast("LinkedIn connected! Upload an image to auto-post.")}
+  /* Facebook & Instagram */
+  if(p.get("fb_token")){
+    localStorage.setItem("fb_token",decodeURIComponent(p.get("fb_token")));
+    localStorage.setItem("fb_page_id",p.get("fb_page_id")||"");
+    localStorage.setItem("fb_ig_id",p.get("fb_ig_id")||"");
+    history.replaceState(null,"",window.location.pathname);
+    updateFbUI();
+    var msg="Facebook connected!";
+    if(p.get("fb_ig_id"))msg+=" Instagram too!";
+    showToast(msg+" Upload an image to auto-post.");
   }
-  function closeModal() {
-    document.getElementById("modal").classList.remove("open");
-    document.querySelector(".page").style.filter = "";
-  }
-  function saveKey() {
-    var k = document.getElementById("key-input").value.trim();
-    if (k) localStorage.setItem("groq_key", k);
-    closeModal();
-  }
+  /* Errors */
+  var s=new URLSearchParams(window.location.search);
+  if(s.get("li_error")){showToast("LinkedIn error: "+s.get("li_error"));history.replaceState(null,"",window.location.pathname)}
+  if(s.get("fb_error")){var e=s.get("fb_error");if(e==="no_pages")e="No Facebook Pages found. Create a Page first.";showToast("Facebook error: "+e);history.replaceState(null,"",window.location.pathname)}
+}
 
-  // Platform pills
-  function togglePill(cb, id) {
-    document.getElementById(id).classList.toggle("selected", cb.checked);
-  }
-  function selectedPlatforms() {
-    return ["linkedin","instagram","facebook"].filter(function(p) {
-      return document.querySelector("#pill-" + p + " input").checked;
-    });
-  }
+/* ── Post to LinkedIn ── */
+async function postToLinkedIn(caption){var token=localStorage.getItem("li_token");if(!token||!imageB64)return;showToast("Posting to LinkedIn...");try{var res=await fetch("/.netlify/functions/linkedin-post",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:token,caption:caption,imageBase64:imageB64,imageType:imageType})});var data=await res.json();if(data.success){showToast("Posted to LinkedIn! ✓")}else if(data.error&&data.error.indexOf("Invalid token")!==-1){localStorage.removeItem("li_token");updateLiUI();showToast("LinkedIn session expired - please reconnect")}else{showToast("LinkedIn failed: "+(data.error||"unknown"))}}catch(err){showToast("LinkedIn error: "+err.message)}}
 
-  // File handling
-  function onFileSelect(e) { if (e.target.files[0]) loadFile(e.target.files[0]); }
-  function onDragOver(e)   { e.preventDefault(); document.getElementById("upload-zone").classList.add("drag-over"); }
-  function onDragLeave()   { document.getElementById("upload-zone").classList.remove("drag-over"); }
-  function onDrop(e) {
-    e.preventDefault();
-    document.getElementById("upload-zone").classList.remove("drag-over");
-    var f = e.dataTransfer.files[0];
-    if (f && f.type.startsWith("image/")) loadFile(f);
-  }
+/* ── Post to Facebook ── */
+async function postToFacebook(caption){var token=localStorage.getItem("fb_token");var pageId=localStorage.getItem("fb_page_id");if(!token||!pageId||!imageB64)return;showToast("Posting to Facebook...");try{var res=await fetch("/.netlify/functions/facebook-post",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pageToken:token,pageId:pageId,caption:caption,imageBase64:imageB64,imageType:imageType})});var data=await res.json();if(data.success){showToast("Posted to Facebook! ✓")}else{showToast("Facebook failed: "+(data.error||"unknown"))}}catch(err){showToast("Facebook error: "+err.message)}}
 
-  function loadFile(file) {
-    if (file.size > 10 * 1024 * 1024) { setStatus("Max 10MB.", "error"); return; }
-    imageFile = file;
-    imageType = file.type.includes("png") ? "png" : file.type.includes("webp") ? "webp" : "jpeg";
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      document.getElementById("preview-img").src = e.target.result;
-      document.getElementById("upload-zone").style.display = "none";
-      document.getElementById("preview-area").style.display = "block";
-      setStatus("", "");
-      imageB64 = e.target.result.split(",")[1];
-      if (file.size > 1.5 * 1024 * 1024) compressImage(e.target.result);
-    };
-    reader.readAsDataURL(file);
-  }
+/* ── Post to Instagram ── */
+async function postToInstagram(caption){var token=localStorage.getItem("fb_token");var igId=localStorage.getItem("fb_ig_id");if(!token||!igId||!imageB64)return;showToast("Posting to Instagram...");try{var res=await fetch("/.netlify/functions/instagram-post",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({igAccountId:igId,pageToken:token,caption:caption,imageBase64:imageB64})});var data=await res.json();if(data.success){showToast("Posted to Instagram! ✓")}else{showToast("Instagram failed: "+(data.error||"unknown"))}}catch(err){showToast("Instagram error: "+err.message)}}
 
-  function compressImage(src) {
-    var img = new Image();
-    img.onload = function() {
-      var c = document.createElement("canvas");
-      var scale = Math.min(1, 1024 / img.width);
-      c.width = img.width * scale; c.height = img.height * scale;
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-      imageB64 = c.toDataURL("image/jpeg", 0.85).split(",")[1];
-      imageType = "jpeg";
-    };
-    img.src = src;
-  }
+/* ── Platform toggles ── */
+function togglePill(cb,id){document.getElementById(id).classList.toggle("selected",cb.checked)}
+function selectedPlatforms(){return["linkedin","instagram","facebook"].filter(function(p){return document.querySelector("#pill-"+p+" input").checked})}
 
-  function changeImage() {
-    document.getElementById("upload-zone").style.display = "flex";
-    document.getElementById("preview-area").style.display = "none";
-    document.getElementById("file-input").value = "";
-    document.getElementById("output-card").style.display = "none";
-    imageB64 = ""; captions = {}; imageFile = null;
-    setStatus("", "");
-  }
+/* ── Image loading ── */
+function onFileSelect(e){if(e.target.files[0])loadFile(e.target.files[0])}
+function onDragOver(e){e.preventDefault();document.getElementById("upload-zone").classList.add("drag-over")}
+function onDragLeave(){document.getElementById("upload-zone").classList.remove("drag-over")}
+function onDrop(e){e.preventDefault();document.getElementById("upload-zone").classList.remove("drag-over");var f=e.dataTransfer.files[0];if(f&&f.type.startsWith("image/"))loadFile(f)}
+function loadFile(file){if(file.size>10*1024*1024){setStatus("Max 10MB.","error");return}imageFile=file;imageType=file.type.indexOf("png")!==-1?"png":file.type.indexOf("webp")!==-1?"webp":"jpeg";var reader=new FileReader();reader.onload=function(e){document.getElementById("preview-img").src=e.target.result;document.getElementById("upload-zone").style.display="none";document.getElementById("preview-area").style.display="block";setStatus("","");imageB64=e.target.result.split(",")[1];if(file.size>1.5*1024*1024)compressImage(e.target.result)};reader.readAsDataURL(file)}
+function compressImage(src){var img=new Image();img.onload=function(){var c=document.createElement("canvas");var sc=Math.min(1,1024/img.width);c.width=img.width*sc;c.height=img.height*sc;c.getContext("2d").drawImage(img,0,0,c.width,c.height);imageB64=c.toDataURL("image/jpeg",.85).split(",")[1];imageType="jpeg"};img.src=src}
+function changeImage(){document.getElementById("upload-zone").style.display="flex";document.getElementById("preview-area").style.display="none";document.getElementById("file-input").value="";document.getElementById("output-card").style.display="none";imageB64="";captions={};imageFile=null;setStatus("","")}
 
-  // Generate all captions
-  async function generateCaptions() {
-    var key = localStorage.getItem("groq_key");
-    if (!key) { openModal(); return; }
-    if (!imageB64) { setStatus("Please upload an image first.", "error"); return; }
-    var selected = selectedPlatforms();
-    if (!selected.length) { setStatus("Select at least one platform.", "error"); return; }
+/* ── Generate captions ── */
+async function generateCaptions(){var key=localStorage.getItem("groq_key");if(!key){openModal();return}if(!imageB64){setStatus("Please upload an image first.","error");return}var sel=selectedPlatforms();if(!sel.length){setStatus("Select at least one platform.","error");return}var btn=document.getElementById("gen-btn");btn.disabled=true;document.getElementById("btn-text").innerHTML='<div class="spinner"></div>';setStatus("Groq Vision is analysing your image...","info");showSkeletons(sel);var rules={linkedin:"Professional tone. Insightful opening. 2-3 short paragraphs. 5-7 hashtags. Max 1200 chars.",instagram:"Fun and visual with emojis. Conversational. 20-25 hashtags. Max 2000 chars.",facebook:"Friendly and conversational. Ask a question at the end. 3-5 hashtags. Max 500 chars."};var rt=sel.map(function(p){return'"'+p+'": '+rules[p]}).join("\n");try{var res=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},body:JSON.stringify({model:"meta-llama/llama-4-scout-17b-16e-instruct",temperature:.8,max_tokens:1800,response_format:{type:"json_object"},messages:[{role:"user",content:[{type:"image_url",image_url:{url:"data:image/"+imageType+";base64,"+imageB64}},{type:"text",text:"Write social media captions for this image.\n\nReturn JSON with keys: "+sel.map(function(p){return'"'+p+'"'}).join(", ")+"\n\nRules:\n"+rt+"\n\nMake each caption specific to the image."}]}]})});if(!res.ok){var er=await res.json().catch(function(){return{}});throw new Error((er.error&&er.error.message)||("Groq error "+res.status))}var data=await res.json();var raw=data.choices[0].message.content.trim().replace(/^```json|^```|```$/gm,"").trim();captions=JSON.parse(raw);showCaptions(sel);setStatus("Captions ready!","ok");
+/* Auto-post to connected platforms */
+if(sel.indexOf("linkedin")!==-1&&localStorage.getItem("li_token")&&captions.linkedin){postToLinkedIn(captions.linkedin)}
+if(sel.indexOf("facebook")!==-1&&localStorage.getItem("fb_token")&&localStorage.getItem("fb_page_id")&&captions.facebook){postToFacebook(captions.facebook)}
+if(sel.indexOf("instagram")!==-1&&localStorage.getItem("fb_token")&&localStorage.getItem("fb_ig_id")&&captions.instagram){postToInstagram(captions.instagram)}
+}catch(e){document.getElementById("output-card").style.display="none";setStatus("Error: "+e.message,"error")}finally{btn.disabled=false;document.getElementById("btn-text").innerHTML="&#9889;&nbsp; Generate &amp; Post"}}
 
-    var btn = document.getElementById("gen-btn");
-    btn.disabled = true;
-    document.getElementById("btn-text").innerHTML = '<div class="spinner"></div>';
-    setStatus("Groq Vision is analysing your image...", "info");
-    showSkeletons(selected);
+/* ── Skeleton placeholders ── */
+function showSkeletons(sel){var out=document.getElementById("output-card");out.style.display="block";out.scrollIntoView({behavior:"smooth",block:"nearest"});document.getElementById("captions-output").innerHTML=sel.map(function(p,i){var pl=platforms[p];return(i>0?'<div class="divider"></div>':'')+'<div id="block-'+p+'"><div class="caption-header"><div class="caption-platform"><div class="cap-icon">'+pl.icon+'</div><div><div class="cap-name">'+pl.name+'</div></div></div></div><div class="caption-text-box"><div class="skeleton" style="width:90%"></div><div class="skeleton" style="width:75%"></div><div class="skeleton" style="width:82%"></div><div class="skeleton" style="width:60%"></div></div></div>'}).join("")}
 
-    var rules = {
-      linkedin:  "Professional tone. Insightful opening. 2-3 short paragraphs. 5-7 hashtags. Max 1200 chars.",
-      instagram: "Fun and visual with emojis. Conversational. 20-25 hashtags. Max 2000 chars.",
-      facebook:  "Friendly and conversational. Ask a question at the end. 3-5 hashtags. Max 500 chars."
-    };
-    var ruleText = selected.map(function(p){ return '"' + p + '": ' + rules[p]; }).join("\n");
+/* ── Show captions ── */
+function showCaptions(sel){document.getElementById("captions-output").innerHTML=sel.map(function(p,i){var text=captions[p]||"";var pl=platforms[p];var liOk=p==="linkedin"&&!!localStorage.getItem("li_token");var fbOk=p==="facebook"&&!!localStorage.getItem("fb_token")&&!!localStorage.getItem("fb_page_id");var igOk=p==="instagram"&&!!localStorage.getItem("fb_token")&&!!localStorage.getItem("fb_ig_id");var postBtn;if(liOk)postBtn='<button class="cap-btn btn-post-li" onclick="postToLinkedIn(captions[\''+p+'\'])">&#128279; Post</button>';else if(fbOk)postBtn='<button class="cap-btn btn-post-fb" onclick="postToFacebook(captions[\''+p+'\'])">&#128279; Post</button>';else if(igOk)postBtn='<button class="cap-btn btn-post-ig" onclick="postToInstagram(captions[\''+p+'\'])">&#128279; Post</button>';else postBtn='<button class="cap-btn" onclick="sharePost(\''+p+'\')">Post &#8599;</button>';return(i>0?'<div class="divider"></div>':'')+'<div id="block-'+p+'"><div class="caption-header"><div class="caption-platform"><div class="cap-icon">'+pl.icon+'</div><div><div class="cap-name">'+pl.name+'</div><div class="cap-chars" id="chars-'+p+'">'+text.length+' chars</div></div></div><div class="cap-actions"><button class="cap-btn btn-copy" id="copy-'+p+'" onclick="copyCaption(\''+p+'\')">&#128203; Copy</button><button class="cap-btn btn-edit" id="edit-'+p+'" onclick="toggleEdit(\''+p+'\')">&#9998; Edit</button><button class="cap-btn" id="regen-'+p+'" onclick="regenCaption(\''+p+'\')">&#8635; Redo</button>'+postBtn+'</div></div><div class="caption-text-box" id="text-'+p+'">'+escHtml(text)+'</div><textarea class="caption-textarea" id="ta-'+p+'" style="display:none" oninput="onEditInput(\''+p+'\')">'+escHtml(text)+'</textarea></div>'}).join("")}
 
-    try {
-      var res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "meta-llama/llama-4-scout-17b-16e-instruct",
-          temperature: 0.8,
-          max_tokens: 1800,
-          response_format: { type: "json_object" },
-          messages: [{
-            role: "user",
-            content: [
-              { type: "image_url", image_url: { url: "data:image/" + imageType + ";base64," + imageB64 } },
-              { type: "text", text: "Look at this image carefully and write social media captions.\n\nReturn JSON with keys: " + selected.map(function(p){ return '"' + p + '"'; }).join(", ") + "\n\nRules:\n" + ruleText + "\n\nMake each caption specific to what is in the image." }
-            ]
-          }]
-        })
-      });
+/* ── Edit / Redo ── */
+function toggleEdit(p){var box=document.getElementById("text-"+p);var ta=document.getElementById("ta-"+p);var btn=document.getElementById("edit-"+p);var editing=ta.style.display!=="none";if(editing){captions[p]=ta.value;box.textContent=ta.value;ta.style.display="none";box.style.display="block";btn.innerHTML="&#9998; Edit";btn.classList.remove("active");document.getElementById("chars-"+p).textContent=ta.value.length+" chars"}else{ta.value=captions[p]||"";ta.style.display="block";box.style.display="none";btn.innerHTML="&#10003; Done";btn.classList.add("active")}}
+function onEditInput(p){document.getElementById("chars-"+p).textContent=document.getElementById("ta-"+p).value.length+" chars"}
 
-      if (!res.ok) {
-        var err = await res.json().catch(function(){ return {}; });
-        throw new Error((err.error && err.error.message) || ("Groq error " + res.status));
-      }
+async function regenCaption(p){var key=localStorage.getItem("groq_key");if(!key||!imageB64)return;var btn=document.getElementById("regen-"+p);btn.disabled=true;btn.innerHTML='<div class="spinner" style="width:11px;height:11px;border-width:1.5px"></div>';var rules={linkedin:"Professional. 2-3 paragraphs. 5-7 hashtags. Max 1200 chars.",instagram:"Fun with emojis. 20-25 hashtags. Max 2000 chars.",facebook:"Friendly, ask a question. 3-5 hashtags. Max 500 chars."};try{var res=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},body:JSON.stringify({model:"meta-llama/llama-4-scout-17b-16e-instruct",temperature:.9,max_tokens:600,response_format:{type:"json_object"},messages:[{role:"user",content:[{type:"image_url",image_url:{url:"data:image/"+imageType+";base64,"+imageB64}},{type:"text",text:'Write a fresh '+p+' caption for this image, different from before.\nRule: '+rules[p]+'\nReturn JSON: {"'+p+'": "caption here"}'}]}]})});var data=await res.json();var raw=JSON.parse(data.choices[0].message.content.trim().replace(/^```json|^```|```$/gm,"").trim());var nt=raw[p]||raw[Object.keys(raw)[0]]||"";captions[p]=nt;var box=document.getElementById("text-"+p);var ta=document.getElementById("ta-"+p);if(box)box.textContent=nt;if(ta)ta.value=nt;var ch=document.getElementById("chars-"+p);if(ch)ch.textContent=nt.length+" chars"}catch(e){console.error(e)}finally{btn.disabled=false;btn.innerHTML="&#8635; Redo"}}
 
-      var data = await res.json();
-      var raw = data.choices[0].message.content.trim().replace(/^```json|^```|```$/gm, "").trim();
-      captions = JSON.parse(raw);
-      showCaptions(selected);
-      setStatus("Captions ready! Copy or post.", "ok");
+/* ── Copy ── */
+function copyCaption(p){if(!captions[p])return;navigator.clipboard.writeText(captions[p]).then(function(){var btn=document.getElementById("copy-"+p);var old=btn.innerHTML;btn.innerHTML="&#10003; Copied!";btn.classList.add("copied");setTimeout(function(){btn.innerHTML=old;btn.classList.remove("copied")},2000)})}
 
-    } catch(e) {
-      document.getElementById("output-card").style.display = "none";
-      setStatus("Error: " + e.message, "error");
-    } finally {
-      btn.disabled = false;
-      document.getElementById("btn-text").innerHTML = "&#9889;&nbsp; Generate Captions";
-    }
-  }
+/* ── Web Share fallback ── */
+async function sharePost(p){var caption=captions[p]||"";try{await navigator.clipboard.writeText(caption)}catch(e){}if(navigator.share&&imageFile){try{var sf=new File([imageFile],imageFile.name,{type:imageFile.type});var sd={files:[sf]};if(navigator.canShare&&navigator.canShare({files:[sf],text:caption}))sd.text=caption;await navigator.share(sd);showToast("Caption copied - paste it in "+platforms[p].name);return}catch(err){if(err.name==="AbortError")return}}window.open(platforms[p].url,"_blank");showToast("Caption copied! Paste it in "+platforms[p].name)}
 
-  // Regen single platform caption
-  async function regenCaption(p) {
-    var key = localStorage.getItem("groq_key");
-    if (!key || !imageB64) return;
+/* ── Helpers ── */
+function setStatus(msg,type){var el=document.getElementById("status");el.textContent=msg;el.className=type?"status "+type:"status"}
+function escHtml(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+var _tt=null;
+function showToast(msg){var el=document.getElementById("toast");el.textContent=msg;el.classList.add("show");if(_tt)clearTimeout(_tt);_tt=setTimeout(function(){el.classList.remove("show")},3500)}
 
-    var btn = document.getElementById("regen-" + p);
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;border-width:1.5px"></div>';
-
-    var rules = {
-      linkedin:  "Professional tone. 2-3 paragraphs. 5-7 hashtags. Max 1200 chars.",
-      instagram: "Fun with emojis. 20-25 hashtags. Max 2000 chars.",
-      facebook:  "Friendly, ask a question. 3-5 hashtags. Max 500 chars."
-    };
-
-    try {
-      var res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "meta-llama/llama-4-scout-17b-16e-instruct",
-          temperature: 0.9,
-          max_tokens: 600,
-          response_format: { type: "json_object" },
-          messages: [{
-            role: "user",
-            content: [
-              { type: "image_url", image_url: { url: "data:image/" + imageType + ";base64," + imageB64 } },
-              { type: "text", text: "Write a fresh " + p + " caption for this image, different from before.\nRule: " + rules[p] + "\nReturn JSON: {\"" + p + "\": \"caption here\"}" }
-            ]
-          }]
-        })
-      });
-      var data = await res.json();
-      var raw = JSON.parse(data.choices[0].message.content.trim().replace(/^```json|^```|```$/gm,"").trim());
-      var newText = raw[p] || raw[Object.keys(raw)[0]] || "";
-      captions[p] = newText;
-      var box = document.getElementById("text-" + p);
-      var ta  = document.getElementById("ta-" + p);
-      if (box) box.textContent = newText;
-      if (ta)  ta.value = newText;
-      var ch = document.getElementById("chars-" + p);
-      if (ch) ch.textContent = newText.length + " chars";
-    } catch(e) {
-      console.error(e);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = "&#8635; Redo";
-    }
-  }
-
-  // Skeletons while loading
-  function showSkeletons(selected) {
-    var out = document.getElementById("output-card");
-    out.style.display = "block";
-    out.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    document.getElementById("captions-output").innerHTML = selected.map(function(p, i) {
-      var pl = platforms[p];
-      return (i > 0 ? '<div class="divider"></div>' : '') +
-        '<div id="block-' + p + '">' +
-        '<div class="caption-header"><div class="caption-platform">' +
-        '<div class="cap-icon">' + pl.icon + '</div>' +
-        '<div><div class="cap-name">' + pl.name + '</div></div>' +
-        '</div></div>' +
-        '<div class="caption-text-box">' +
-        '<div class="skeleton" style="width:90%"></div>' +
-        '<div class="skeleton" style="width:75%"></div>' +
-        '<div class="skeleton" style="width:82%"></div>' +
-        '<div class="skeleton" style="width:60%"></div>' +
-        '</div></div>';
-    }).join("");
-  }
-
-  // Show filled captions
-  function showCaptions(selected) {
-    document.getElementById("captions-output").innerHTML = selected.map(function(p, i) {
-      var text = captions[p] || "";
-      var pl = platforms[p];
-      return (i > 0 ? '<div class="divider"></div>' : '') +
-        '<div id="block-' + p + '">' +
-        '<div class="caption-header">' +
-        '<div class="caption-platform">' +
-        '<div class="cap-icon">' + pl.icon + '</div>' +
-        '<div>' +
-        '<div class="cap-name">' + pl.name + '</div>' +
-        '<div class="cap-chars" id="chars-' + p + '">' + text.length + ' chars</div>' +
-        '</div></div>' +
-        '<div class="cap-actions">' +
-        '<button class="cap-btn btn-copy" id="copy-' + p + '" onclick="copyCaption(\'' + p + '\')">&#128203; Copy</button>' +
-        '<button class="cap-btn btn-edit" id="edit-' + p + '" onclick="toggleEdit(\'' + p + '\')">&#9998; Edit</button>' +
-        '<button class="cap-btn btn-regen" id="regen-' + p + '" onclick="regenCaption(\'' + p + '\')">&#8635; Redo</button>' +
-        '<button class="cap-btn btn-post" onclick="sharePost(\'' + p + '\')">Post &#8599;</button>' +
-        '</div></div>' +
-        '<div class="caption-text-box" id="text-' + p + '">' + escHtml(text) + '</div>' +
-        '<textarea class="caption-textarea" id="ta-' + p + '" style="display:none" oninput="onEditInput(\'' + p + '\')">' + escHtml(text) + '</textarea>' +
-        '</div>';
-    }).join("");
-  }
-
-  // Edit toggle
-  function toggleEdit(p) {
-    var box = document.getElementById("text-" + p);
-    var ta  = document.getElementById("ta-" + p);
-    var btn = document.getElementById("edit-" + p);
-    var editing = ta.style.display !== "none";
-    if (editing) {
-      captions[p] = ta.value;
-      box.textContent = ta.value;
-      ta.style.display = "none";
-      box.style.display = "block";
-      btn.innerHTML = "&#9998; Edit";
-      btn.classList.remove("active");
-      document.getElementById("chars-" + p).textContent = ta.value.length + " chars";
-    } else {
-      ta.value = captions[p] || "";
-      ta.style.display = "block";
-      box.style.display = "none";
-      btn.innerHTML = "&#10003; Done";
-      btn.classList.add("active");
-    }
-  }
-  function onEditInput(p) {
-    var ta = document.getElementById("ta-" + p);
-    document.getElementById("chars-" + p).textContent = ta.value.length + " chars";
-  }
-
-  // Copy
-  function copyCaption(p) {
-    if (!captions[p]) return;
-    navigator.clipboard.writeText(captions[p]).then(function() {
-      var btn = document.getElementById("copy-" + p);
-      var old = btn.innerHTML;
-      btn.innerHTML = "&#10003; Copied!";
-      btn.classList.add("copied");
-      setTimeout(function() { btn.innerHTML = old; btn.classList.remove("copied"); }, 2000);
-    });
-  }
-
-  // Post / Share
-  async function sharePost(p) {
-    var caption = captions[p] || "";
-
-    // Mobile: Web Share API with image file + caption
-    if (navigator.canShare && imageFile) {
-      var shareFile = new File([imageFile], imageFile.name, { type: imageFile.type });
-      if (navigator.canShare({ files: [shareFile], text: caption })) {
-        try {
-          await navigator.share({ text: caption, files: [shareFile] });
-          return;
-        } catch(err) {
-          if (err.name === "AbortError") return;
-        }
-      }
-    }
-
-    // Desktop fallback: copy + open platform
-    if (caption) {
-      try { await navigator.clipboard.writeText(caption); } catch(e) {}
-    }
-    window.open(platforms[p].url, "_blank");
-    setStatus("Caption copied — paste it in the post box.", "info");
-  }
-
-  function setStatus(msg, type) {
-    var el = document.getElementById("status");
-    el.textContent = msg;
-    el.className = type ? "status " + type : "status";
-  }
-
-  function escHtml(s) {
-    return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  }
-
-  window.onload = function() {
-    if (!localStorage.getItem("groq_key")) setTimeout(openModal, 600);
-  };
+window.onload=function(){handleOAuthReturn();updateLiUI();updateFbUI();if(!localStorage.getItem("groq_key"))setTimeout(openModal,600)};
 </script>
-
 </body>
 </html>
